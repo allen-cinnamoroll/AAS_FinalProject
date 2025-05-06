@@ -47,7 +47,6 @@ app.use('/api/instructors', instructorRoutes);
 app.use('/api/auth', authRouter);
 app.use('/api/otp', otpRoutes);
 app.use('/api/instructor-auth', instructorAuthRoutes);
-app.use('/api/admin-auth', adminAuthRouter);
 
 const server = http.createServer(app);
 //server port

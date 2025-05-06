@@ -1,44 +1,30 @@
 import { body, validationResult } from "express-validator";
 
-
 // Instructor registration validation rules
-export const instructorValidationRules = () => [
-    body("firstName")
-        .notEmpty().withMessage("First name is required")
-        .trim()
-        .isLength({ min: 2 }).withMessage("First name must be at least 2 characters"),
-    
-    body("lastName")
-        .notEmpty().withMessage("Last name is required")
-        .trim()
-        .isLength({ min: 2 }).withMessage("Last name must be at least 2 characters"),
-    
-    body("middleName")
-        .optional()
-        .trim(),
-    
-    body("suffix")
-        .optional()
-        .isIn(['Jr.', 'Sr.', 'I', 'II', 'III', 'IV', 'V', '']).withMessage("Invalid suffix value"),
-    
-    body("program")
-        .notEmpty().withMessage("Program is required")
-        .trim()
-        .isLength({ min: 2 }).withMessage("Program must be at least 2 characters"),
-    
-    body("faculty")
-        .notEmpty().withMessage("Faculty is required")
-        .trim()
-        .isLength({ min: 2 }).withMessage("Faculty must be at least 2 characters"),
-];
+export const instructorValidationRules = () => {
+    return [
+        body('firstName').trim().notEmpty().withMessage('First name is required'),
+        body('lastName').trim().notEmpty().withMessage('Last name is required'),
+        body('program').trim().notEmpty().withMessage('Program is required'),
+        body('faculty').trim().notEmpty().withMessage('Faculty is required'),
+        body('gmail')
+            .trim()
+            .notEmpty()
+            .withMessage('Gmail is required')
+            .matches(/^[a-zA-Z0-9._%+-]+@gmail\.com$/)
+            .withMessage('Please provide a valid Gmail address'),
+        body('suffix')
+            .optional()
+            .isIn(['Jr.', 'Sr.', 'I', 'II', 'III', 'IV', 'V', ''])
+            .withMessage('Invalid suffix value'),
+    ];
+};
 
 // Photo validation middleware
 export const photoValidation = (req, res, next) => {
+    // Skip validation if no file is uploaded during update
     if (!req.file) {
-        return res.status(400).json({
-            success: false,
-            message: "ID photo is required"
-        });
+        return next();
     }
 
     const allowedTypes = ['image/jpeg', 'image/png', 'image/jpg'];

@@ -120,8 +120,117 @@ const getInstructorById = async (req, res) => {
     }
 };
 
+const updateInstructor = async (req, res) => {
+    try {
+        const {
+            firstName,
+            lastName,
+            middleName,
+            suffix,
+            program,
+            faculty,
+            gmail
+        } = req.body;
+
+        // Find instructor first
+        const instructor = await Instructor.findById(req.params.id);
+        if (!instructor) {
+            return res.status(404).json({
+                success: false,
+                message: "Instructor not found"
+            });
+        }
+
+        // Check if new gmail is already taken by another instructor
+        if (gmail && gmail !== instructor.gmail) {
+            const gmailExists = await Instructor.findOne({ gmail });
+            if (gmailExists) {
+                return res.status(400).json({
+                    success: false,
+                    message: "Gmail already registered to another instructor"
+                });
+            }
+        }
+
+        // Handle photo upload if new photo is provided
+        let photoData = instructor.idPhoto;
+        if (req.file) {
+            photoData = {
+                url: req.file.path,
+                publicId: req.file.filename,
+                metadata: {
+                    fileName: req.file.originalname,
+                    fileType: req.file.mimetype,
+                    fileSize: req.file.size
+                }
+            };
+        }
+
+        // Update instructor
+        const updatedInstructor = await Instructor.findByIdAndUpdate(
+            req.params.id,
+            {
+                firstName,
+                lastName,
+                middleName,
+                suffix,
+                program,
+                faculty,
+                gmail,
+                idPhoto: photoData
+            },
+            {
+                new: true, // Return updated document
+                runValidators: true // Run schema validators
+            }
+        );
+
+        res.status(200).json({
+            success: true,
+            message: "Instructor updated successfully",
+            data: updatedInstructor
+        });
+
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: "Error updating instructor",
+            error: error.message
+        });
+    }
+};
+
+const deleteInstructor = async (req, res) => {
+    try {
+        const instructor = await Instructor.findById(req.params.id);
+        
+        if (!instructor) {
+            return res.status(404).json({
+                success: false,
+                message: "Instructor not found"
+            });
+        }
+
+        await Instructor.findByIdAndDelete(req.params.id);
+
+        res.status(200).json({
+            success: true,
+            message: "Instructor deleted successfully"
+        });
+
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: "Error deleting instructor",
+            error: error.message
+        });
+    }
+};
+
 export {
     registerInstructor,
     getAllInstructors,
-    getInstructorById
+    getInstructorById,
+    updateInstructor,
+    deleteInstructor
 };

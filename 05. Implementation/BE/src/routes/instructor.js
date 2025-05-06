@@ -1,5 +1,11 @@
 import express from 'express';
-import { registerInstructor, getAllInstructors, getInstructorById } from '../controllers/instructorController.js';
+import { 
+    registerInstructor, 
+    getAllInstructors, 
+    getInstructorById, 
+    updateInstructor,
+    deleteInstructor 
+} from '../controllers/instructorController.js';
 import { authenticate, authorizeRole } from '../middleware/authMiddleware.js';
 import { instructorValidationRules, validate, photoValidation } from '../middleware/validator.js';
 import upload from '../middleware/upload.js';
@@ -29,6 +35,24 @@ router.get('/:id',
     authenticate,
     authorizeRole('admin', 'instructor'),
     getInstructorById
+);
+
+// PUT - Update instructor (Protected + Admin only)
+router.put('/:id',
+    authenticate,
+    authorizeRole('admin'),
+    upload.single('idPhoto'), // Photo upload becomes optional
+    instructorValidationRules(),
+    validate,
+    photoValidation, // Now handles optional photo
+    updateInstructor
+);
+
+// DELETE - Delete instructor (Protected + Admin only)
+router.delete('/:id',
+    authenticate,
+    authorizeRole('admin'),
+    deleteInstructor
 );
 
 export default router;
