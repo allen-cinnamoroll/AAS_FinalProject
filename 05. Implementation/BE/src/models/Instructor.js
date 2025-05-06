@@ -83,6 +83,16 @@ const instructorSchema = new mongoose.Schema({
     lastLogin: {
         type: Date,
         default: null
+    },
+    otp: {
+        code: {
+            type: String,
+            default: null
+        },
+        expiresAt: {
+            type: Date,
+            default: null
+        }
     }
 }, {
     timestamps: true,

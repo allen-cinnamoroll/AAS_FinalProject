@@ -7,6 +7,7 @@ import dotenv from "dotenv";
 import instructorRoutes from './src/routes/instructor.js';
 import authRouter from './src/routes/auth.js';
 import otpRoutes from './src/routes/otpRoutes.js';
+import instructorAuthRoutes from './src/routes/instructorAuth.js';
 import fs from 'fs';
 import path from 'path';
 
@@ -44,6 +45,7 @@ database.on("error", console.error.bind(console, "MongoDB connection error:"));
 app.use('/api/instructors', instructorRoutes);
 app.use('/api/auth', authRouter);
 app.use('/api/otp', otpRoutes);
+app.use('/api/instructor-auth', instructorAuthRoutes);
 
 const server = http.createServer(app);
 //server port
