@@ -1,5 +1,5 @@
 import { generateOTP, sendOTP } from '../utils/emailUtil.js';
-import UserModel from '../models/UserModel.js';
+import UserModel from '../models/AdminModel.js';
 
 export const sendVerificationOTP = async (req, res) => {
     const { email } = req.body;
