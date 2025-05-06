@@ -8,6 +8,7 @@ import instructorRoutes from './src/routes/instructor.js';
 import authRouter from './src/routes/auth.js';
 import otpRoutes from './src/routes/otpRoutes.js';
 import instructorAuthRoutes from './src/routes/instructorAuth.js';
+import adminAuthRouter from './src/routes/auth.js';
 import fs from 'fs';
 import path from 'path';
 
@@ -46,6 +47,7 @@ app.use('/api/instructors', instructorRoutes);
 app.use('/api/auth', authRouter);
 app.use('/api/otp', otpRoutes);
 app.use('/api/instructor-auth', instructorAuthRoutes);
+app.use('/api/admin-auth', adminAuthRouter);
 
 const server = http.createServer(app);
 //server port
