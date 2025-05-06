@@ -8,13 +8,13 @@ const router = express.Router();
 
 // POST - Register new instructor (Protected + Admin only)
 router.post('/register',
-    authenticate, // Check if user is logged in
+    authenticate, // Verify JWT token
     authorizeRole('admin'), // Only admin can register instructors
     upload.single('idPhoto'), // Handle photo upload
     instructorValidationRules(), // Validate input fields
     validate, // Handle validation errors
     photoValidation, // Validate photo
-    registerInstructor // Controller function
+    registerInstructor
 );
 
 // GET - Get all instructors (Protected)

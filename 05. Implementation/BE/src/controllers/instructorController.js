@@ -7,20 +7,30 @@ const registerInstructor = async (req, res) => {
             lastName,
             middleName,
             suffix,
+            instructorId,
             program,
             faculty,
             gmail
         } = req.body;
 
-        // Check if required fields are present
-        if (!firstName || !lastName || !program || !faculty || !gmail) {
+        // Check if instructor already exists
+        const instructorExists = await Instructor.findOne({
+            $or: [
+                { instructorId },
+                { gmail }
+            ]
+        });
+
+        if (instructorExists) {
             return res.status(400).json({
                 success: false,
-                message: "Please provide all required fields"
+                message: instructorExists.instructorId === instructorId 
+                    ? "Instructor ID already exists"
+                    : "Gmail already registered"
             });
         }
 
-        // Handle photo upload - assuming photo data is in req.file from middleware
+        // Handle photo upload
         if (!req.file) {
             return res.status(400).json({
                 success: false,
@@ -29,8 +39,8 @@ const registerInstructor = async (req, res) => {
         }
 
         const photoData = {
-            url: req.file.path, // This will be updated with cloud storage URL
-            publicId: req.file.filename, // This will be updated with cloud storage ID
+            url: req.file.path,
+            publicId: req.file.filename,
             metadata: {
                 fileName: req.file.originalname,
                 fileType: req.file.mimetype,
@@ -38,15 +48,19 @@ const registerInstructor = async (req, res) => {
             }
         };
 
+        // Create new instructor with role=1 and initial lastLogin=null
         const newInstructor = new Instructor({
             firstName,
             lastName,
             middleName,
             suffix,
+            instructorId,
             program,
             faculty,
             gmail,
-            idPhoto: photoData
+            idPhoto: photoData,
+            role: "1", // Instructor role
+            lastLogin: null
         });
 
         const savedInstructor = await newInstructor.save();
@@ -58,13 +72,6 @@ const registerInstructor = async (req, res) => {
         });
 
     } catch (error) {
-        if (error.code === 11000) { // Duplicate key error
-            return res.status(400).json({
-                success: false,
-                message: "Instructor ID or Gmail already exists"
-            });
-        }
-
         res.status(500).json({
             success: false,
             message: "Error registering instructor",

@@ -1,13 +1,7 @@
 import mongoose from "mongoose";
 import bcrypt from "bcryptjs";
 
-/**role ={
- * 0 - admin
- * 1 - instructor
- * 2 - student
-} */
-
-const userSchema = new mongoose.Schema(
+const adminSchema = new mongoose.Schema(
   {
     username: {
       type: String,
@@ -27,8 +21,9 @@ const userSchema = new mongoose.Schema(
     },
     role: {
       type: String,
-      enum: ["0", "1", "2"],
+      enum: ["0"],  // Only admin role
       default: "0",
+      immutable: true
     },
     isPasswordChange:{
       type: Boolean,
@@ -43,44 +38,34 @@ const userSchema = new mongoose.Schema(
           type: Date,
           default: null
       }
-  },
-  isEmailVerified: {
-      type: Boolean,
-      default: false
-  },
-  lastLogin: {
-      type: Date,
-      default: null
-  }
+    },
+    isEmailVerified: {
+        type: Boolean,
+        default: false
+    },
+    lastLogin: {
+        type: Date,
+        default: null
+    }
   },
   { timestamps: true }
 );
 
-// Pre-save hook to hash the password before saving it to the database
-userSchema.pre(
-  "save",
-  async function (next) {
-    const user = this;
-
-    // Only hash the password if it has been modified (or is new)
-    if (user.isModified("password")) {
-      try {
-        // Generate a salt and hash the password
-        const salt = await bcrypt.genSalt(10);
-        user.password = await bcrypt.hash(user.password, salt);
-      } catch (err) {
-        return next(err);
-      }
+// Pre-save hook to hash the password
+adminSchema.pre("save", async function (next) {
+  if (this.isModified("password")) {
+    try {
+      const salt = await bcrypt.genSalt(10);
+      this.password = await bcrypt.hash(this.password, salt);
+    } catch (err) {
+      return next(err);
     }
-    next();
-  },
-  { discriminatorKey: "role", collection: "users" }
-);
+  }
+  next();
+});
 
-
-
-// Add the password comparison method
-userSchema.methods.comparePassword = async function(candidatePassword) {
+// Password comparison method
+adminSchema.methods.comparePassword = async function(candidatePassword) {
   try {
       return await bcrypt.compare(candidatePassword, this.password);
   } catch (error) {
@@ -88,6 +73,6 @@ userSchema.methods.comparePassword = async function(candidatePassword) {
   }
 };
 
-const UserModel = mongoose.model("Users", userSchema);
+const AdminModel = mongoose.model("Admin", adminSchema);
 
-export default UserModel;
+export default AdminModel;

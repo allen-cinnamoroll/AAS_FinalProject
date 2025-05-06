@@ -7,6 +7,8 @@ import dotenv from "dotenv";
 import instructorRoutes from './src/routes/instructor.js';
 import authRouter from './src/routes/auth.js';
 import otpRoutes from './src/routes/otpRoutes.js';
+import fs from 'fs';
+import path from 'path';
 
 //Load environment variables from .env file
 dotenv.config();
