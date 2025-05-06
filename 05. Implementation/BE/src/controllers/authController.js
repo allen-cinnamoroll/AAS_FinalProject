@@ -29,7 +29,7 @@ export const register = async (req, res) => {
             username,
             email,
             password,
-            role: role || 'user' // Default to 'user' if role is not specified
+            role: "0"
         });
 
         res.status(200).json({
@@ -66,6 +66,10 @@ export const login = async (req, res) => {
                 message: "Password is incorrect"
             });
         }
+
+        // Update last login time
+        user.lastLogin = new Date();
+        await user.save();
 
         // Generate JWT token
         const token = jwt.sign(
