@@ -46,22 +46,6 @@ const assignedCourseSchema = new mongoose.Schema({
         type: scheduleSchema,
         required: [true, "Schedule is required"]
     },
-    academicYear: {
-        type: String,
-        required: [true, "Academic year is required"],
-        match: [
-            /^\d{4}-\d{4}$/,
-            "Academic year must be in format: YYYY-YYYY (e.g., 2023-2024)"
-        ],
-        validate: {
-            validator: function(value) {
-                const [start, end] = value.split('-').map(Number);
-                return end === start + 1;
-            },
-            message: "End year must be the next year after start year"
-        },
-        trim: true
-    },
     semester: {
         type: String,
         required: [true, "Semester is required"],
@@ -77,7 +61,6 @@ assignedCourseSchema.index(
     { 
         course: 1, 
         section: 1, 
-        academicYear: 1, 
         semester: 1 
     }, 
     { unique: true }

@@ -9,7 +9,6 @@ const assignCourse = async (req, res) => {
             instructorId,
             section,
             schedule,
-            academicYear,
             semester
         } = req.body;
 
@@ -37,7 +36,6 @@ const assignCourse = async (req, res) => {
             instructor: instructorId,  // map instructorId to instructor
             section,
             schedule,
-            academicYear,
             semester
         });
 
@@ -117,7 +115,6 @@ const updateAssignedCourse = async (req, res) => {
         const {
             section,
             schedule,
-            academicYear,
             semester
         } = req.body;
 
@@ -136,7 +133,6 @@ const updateAssignedCourse = async (req, res) => {
                 {
                     section,
                     schedule,
-                    academicYear,
                     semester
                 },
                 {

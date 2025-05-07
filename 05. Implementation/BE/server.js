@@ -15,6 +15,7 @@ import studentRoutes from './src/routes/student.js';
 import studentAuthRoutes from './src/routes/studentAuth.js';
 import courseRoutes from './src/routes/course.js';
 import assignedCourseRoutes from './src/routes/assignedCourse.js';
+import enrollmentRoutes from './src/routes/enrollment.js';
 
 //Load environment variables from .env file
 dotenv.config();
@@ -55,6 +56,7 @@ app.use('/api/students', studentRoutes);
 app.use('/api/student-auth', studentAuthRoutes);
 app.use('/api/courses', courseRoutes);
 app.use('/api/assigned-courses', assignedCourseRoutes);
+app.use('/api/enrollments', enrollmentRoutes);
 
 const server = http.createServer(app);
 //server port
