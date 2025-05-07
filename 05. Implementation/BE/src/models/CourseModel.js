@@ -5,6 +5,7 @@ const courseSchema = new mongoose.Schema({
         type: String,
         required: [true, "Course ID is required"],
         trim: true,
+        uppercase: true,
     },
     description: {
         type: String,
@@ -42,6 +43,9 @@ const courseSchema = new mongoose.Schema({
 }, {
     timestamps: true
 });
+
+// Remove any existing indexes on courseId
+courseSchema.index({ courseId: 1 }, { unique: false });
 
 // Virtual for full course name
 courseSchema.virtual('fullCourseName').get(function() {
