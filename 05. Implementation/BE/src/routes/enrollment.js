@@ -4,35 +4,37 @@ import {
     getStudentEnrollments,
     getInstructorEnrollments,
     getAllEnrollments,
-    dropEnrollment
+    deleteEnrollment
 } from '../controllers/enrollmentController.js';
 import { authenticate, authorizeRole } from '../middleware/authMiddleware.js';
 
 const router = express.Router();
 
-// Student routes
+// Admin routes for enrollment management
 router.post('/enroll',
     authenticate,
-    authorizeRole('2'), // Student role
+    authorizeRole('admin'),
     enrollStudent
 );
 
+// Student can only view their enrollments
 router.get('/my-enrollments',
     authenticate,
     authorizeRole('2'),
     getStudentEnrollments
 );
 
-router.delete('/drop/:enrollmentId',
+// Delete enrollment (Admin only)
+router.delete('/:id',
     authenticate,
-    authorizeRole('2'),
-    dropEnrollment
+    authorizeRole('admin'),
+    deleteEnrollment
 );
 
 // Instructor routes
 router.get('/instructor-enrollments',
     authenticate,
-    authorizeRole('1'), // Instructor role
+    authorizeRole('1'),
     getInstructorEnrollments
 );
 

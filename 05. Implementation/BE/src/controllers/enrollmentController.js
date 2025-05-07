@@ -3,8 +3,7 @@ import AssignedCourseModel from '../models/AssignedCourseModel.js';
 
 const enrollStudent = async (req, res) => {
     try {
-        const { assignedCourseId } = req.body;
-        const studentId = req.user._id; // From auth middleware
+        const { studentId, assignedCourseId } = req.body;
 
         // Check if course exists and is available
         const assignedCourse = await AssignedCourseModel
@@ -18,41 +17,37 @@ const enrollStudent = async (req, res) => {
             });
         }
 
-        // Check if student is already enrolled
-        const existingEnrollment = await EnrollmentModel.findOne({
-            student: studentId,
-            assignedCourse: assignedCourseId,
-            academicYear: assignedCourse.academicYear,
-            semester: assignedCourse.semester
-        });
-
-        if (existingEnrollment) {
-            return res.status(400).json({
-                success: false,
-                message: "Already enrolled in this course"
-            });
-        }
-
-        // Create enrollment
+        // Create enrollment using values from assignedCourse
         const enrollment = new EnrollmentModel({
             student: studentId,
             assignedCourse: assignedCourseId,
-            academicYear: assignedCourse.academicYear,
-            semester: assignedCourse.semester
+            academicYear: assignedCourse.academicYear,  // Gets academicYear from assignedCourse
+            semester: assignedCourse.semester           // Gets semester from assignedCourse
         });
 
         await enrollment.save();
 
+        const populatedEnrollment = await EnrollmentModel
+            .findById(enrollment._id)
+            .populate('student')
+            .populate({
+                path: 'assignedCourse',
+                populate: [
+                    { path: 'course' },
+                    { path: 'instructor' }
+                ]
+            });
+
         res.status(201).json({
             success: true,
-            message: "Successfully enrolled in course",
-            data: enrollment
+            message: "Successfully enrolled student in course",
+            data: populatedEnrollment
         });
 
     } catch (error) {
         res.status(500).json({
             success: false,
-            message: "Error enrolling in course",
+            message: "Error enrolling student",
             error: error.message
         });
     }
@@ -141,17 +136,10 @@ const getAllEnrollments = async (req, res) => {
     }
 };
 
-// Delete enrollment (drop course)
-const dropEnrollment = async (req, res) => {
+const deleteEnrollment = async (req, res) => {
     try {
-        const { enrollmentId } = req.params;
-        const studentId = req.user._id;
-
-        const enrollment = await EnrollmentModel.findOne({
-            _id: enrollmentId,
-            student: studentId
-        });
-
+        const enrollment = await EnrollmentModel.findById(req.params.id);
+        
         if (!enrollment) {
             return res.status(404).json({
                 success: false,
@@ -159,16 +147,17 @@ const dropEnrollment = async (req, res) => {
             });
         }
 
-        await EnrollmentModel.findByIdAndDelete(enrollmentId);
+        await EnrollmentModel.findByIdAndDelete(req.params.id);
 
         res.status(200).json({
             success: true,
-            message: "Successfully dropped the course"
+            message: "Enrollment deleted successfully"
         });
+
     } catch (error) {
         res.status(500).json({
             success: false,
-            message: "Error dropping course",
+            message: "Error deleting enrollment",
             error: error.message
         });
     }
@@ -179,5 +168,5 @@ export {
     getStudentEnrollments,
     getInstructorEnrollments,
     getAllEnrollments,
-    dropEnrollment
+    deleteEnrollment
 };
