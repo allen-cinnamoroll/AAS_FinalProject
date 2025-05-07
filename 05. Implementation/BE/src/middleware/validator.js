@@ -91,6 +91,44 @@ export const studentValidationRules = () => {
     ];
 };
 
+export const courseValidationRules = () => {
+    return [
+        body('courseId')
+            .trim()
+            .notEmpty()
+            .withMessage('Course ID is required'),
+        body('description')
+            .trim()
+            .notEmpty()
+            .withMessage('Course description is required'),
+        body('courseType')
+            .trim()
+            .notEmpty()
+            .withMessage('Course type is required')
+            .isIn(['Lab', 'Lec'])
+            .withMessage('Course type must be either Lab or Lec'),
+        body('units')
+            .isNumeric()
+            .withMessage('Units must be a number')
+            .isInt({ min: 1, max: 6 })
+            .withMessage('Units must be between 1 and 6'),
+        body('term')
+            .trim()
+            .notEmpty()
+            .withMessage('Term is required')
+            .isIn(['1', '2'])
+            .withMessage('Term must be either 1 or 2'),
+        body('faculty')
+            .trim()
+            .notEmpty()
+            .withMessage('Faculty is required'),
+        body('program')
+            .trim()
+            .notEmpty()
+            .withMessage('Program is required')
+    ];
+};
+
 // Middleware to handle validation errors
 export const validate = (req, res, next) => {
     const errors = validationResult(req);

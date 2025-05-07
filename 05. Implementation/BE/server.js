@@ -13,6 +13,8 @@ import fs from 'fs';
 import path from 'path';
 import studentRoutes from './src/routes/student.js';
 import studentAuthRoutes from './src/routes/studentAuth.js';
+import courseRoutes from './src/routes/course.js';
+import assignedCourseRoutes from './src/routes/assignedCourse.js';
 
 //Load environment variables from .env file
 dotenv.config();
@@ -51,6 +53,8 @@ app.use('/api/otp', otpRoutes);
 app.use('/api/instructor-auth', instructorAuthRoutes);
 app.use('/api/students', studentRoutes);
 app.use('/api/student-auth', studentAuthRoutes);
+app.use('/api/courses', courseRoutes);
+app.use('/api/assigned-courses', assignedCourseRoutes);
 
 const server = http.createServer(app);
 //server port
