@@ -1,6 +1,10 @@
 import express from "express";
 import { registrationValidationRules, validate } from "../middleware/validator.js";
-import { login, register, refreshAccessToken } from "../controllers/authController.js";
+import { 
+    register, 
+    login, 
+    refreshAccessToken 
+} from '../controllers/adminController.js';
 
 const authRouter = express.Router();
 
