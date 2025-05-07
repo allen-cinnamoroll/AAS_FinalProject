@@ -12,6 +12,7 @@ import adminAuthRouter from './src/routes/auth.js';
 import fs from 'fs';
 import path from 'path';
 import studentRoutes from './src/routes/student.js';
+import studentAuthRoutes from './src/routes/studentAuth.js';
 
 //Load environment variables from .env file
 dotenv.config();
@@ -49,6 +50,7 @@ app.use('/api/auth', authRouter);
 app.use('/api/otp', otpRoutes);
 app.use('/api/instructor-auth', instructorAuthRoutes);
 app.use('/api/students', studentRoutes);
+app.use('/api/student-auth', studentAuthRoutes);
 
 const server = http.createServer(app);
 //server port
