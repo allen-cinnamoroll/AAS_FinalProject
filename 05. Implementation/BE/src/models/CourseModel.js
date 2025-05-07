@@ -5,17 +5,6 @@ const courseSchema = new mongoose.Schema({
         type: String,
         required: [true, "Course ID is required"],
         trim: true,
-        uppercase: true,
-        validate: {
-            validator: async function(value) {
-                const count = await mongoose.models.Course.countDocuments({ 
-                    courseId: value,
-                    _id: { $ne: this._id } // Exclude current document
-                });
-                return count < 2; // Allow maximum of 2 (original + 1 duplicate)
-            },
-            message: props => `Course ID '${props.value}' cannot have more than 2 instances`
-        }
     },
     description: {
         type: String,
