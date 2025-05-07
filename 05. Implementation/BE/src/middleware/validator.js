@@ -60,6 +60,37 @@ export const registrationValidationRules = () => {
     ];
 };
 
+export const studentValidationRules = () => {
+    return [
+        body('firstName').trim().notEmpty().withMessage('First name is required'),
+        body('lastName').trim().notEmpty().withMessage('Last name is required'),
+        body('yearLevel')
+            .trim()
+            .notEmpty()
+            .withMessage('Year level is required')
+            .isIn(['1', '2', '3', '4'])
+            .withMessage('Invalid year level'),
+        body('program').trim().notEmpty().withMessage('Program is required'),
+        body('faculty').trim().notEmpty().withMessage('Faculty is required'),
+        body('studentId') // Changed from schoolId
+            .trim()
+            .notEmpty()
+            .withMessage('Student ID is required')
+            .matches(/^[0-9]{4}-[0-9]{4}$/)
+            .withMessage('Student ID must follow the format: 0000-0000'),
+        body('gmail')
+            .trim()
+            .notEmpty()
+            .withMessage('Gmail is required')
+            .matches(/^[a-zA-Z0-9._%+-]+@gmail\.com$/)
+            .withMessage('Please provide a valid Gmail address'),
+        body('suffix')
+            .optional()
+            .isIn(['Jr.', 'Sr.', 'I', 'II', 'III', 'IV', 'V', ''])
+            .withMessage('Invalid suffix value'),
+    ];
+};
+
 // Middleware to handle validation errors
 export const validate = (req, res, next) => {
     const errors = validationResult(req);
