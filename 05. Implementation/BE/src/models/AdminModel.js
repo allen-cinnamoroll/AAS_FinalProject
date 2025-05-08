@@ -5,9 +5,9 @@ const adminSchema = new mongoose.Schema(
   {
     username: {
       type: String,
-      required: [true, "username is required"],
+      required: [true, "Username is required"],
     },
-    email: {
+    gmail: {  // Changed from email to gmail
       type: String,
       required: [true, "Gmail address is required"],
       unique: true,
@@ -17,7 +17,7 @@ const adminSchema = new mongoose.Schema(
     },
     password: {
       type: String,
-      required: [true, "password is required"],
+      required: [true, "Password is required"],
     },
     role: {
       type: String,

@@ -55,7 +55,7 @@ app.use('/api/student-auth', studentAuthRoutes);
 app.use('/api/courses', courseRoutes);
 app.use('/api/assigned-courses', assignedCourseRoutes);
 app.use('/api/enrollments', enrollmentRoutes);
-app.use('/api/admin', adminRoutes);
+app.use('/api/admin', adminRoutes);  // This maps all admin routes to /api/admin/*
 
 const server = http.createServer(app);
 //server port

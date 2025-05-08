@@ -10,10 +10,10 @@ const REFRESH_KEY = process.env.REFRESH_TOKEN_SECRET;
 const REFRESH_EXPIRATION = process.env.REFRESH_TOKEN_EXPIRATION || '7d';
 
 export const register = async (req, res) => {
-    const { username, email, password, role } = req.body;
+    const { username, gmail, password, role } = req.body;
     try {
         const userExists = await UserModel.findOne({
-            $or: [{ username }, { email }],
+            $or: [{ username }, { gmail }],
         });
 
         if (userExists) {
@@ -27,7 +27,7 @@ export const register = async (req, res) => {
 
         await UserModel.create({
             username,
-            email,
+            gmail,
             password,
             role: "0"
         });
@@ -45,11 +45,11 @@ export const register = async (req, res) => {
 };
 
 export const login = async (req, res) => {
-    const { email, password } = req.body;
+    const { gmail, password } = req.body;
 
     try {
         const user = await UserModel.findOne({
-            $or: [{ email }, { username: email }]
+            $or: [{ gmail }, { username: gmail }]
         });
 
         if (!user) {
@@ -77,7 +77,7 @@ export const login = async (req, res) => {
                 userId: user._id,
                 username: user.username,
                 role: user.role,
-                email: user.email,
+                gmail: user.gmail,
                 isPasswordChange: user.isPasswordChange
             },
             ACCESS_KEY,
@@ -146,7 +146,7 @@ export const refreshAccessToken = async (req, res, next) => {
                     userId: currentUser._id,
                     username: currentUser.username,
                     role: currentUser.role,
-                    email: currentUser.email,
+                    gmail: currentUser.gmail,
                     isPasswordChange: currentUser.isPasswordChange
                 },
                 ACCESS_KEY,
