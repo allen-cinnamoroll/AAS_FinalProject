@@ -157,9 +157,10 @@ export const verifyOTP = async (req, res) => {
             });
         }
 
-        // Clear OTP and update login time
+        // Clear OTP, update login time and email verification
         user.otp = null;
         user.lastLogin = new Date();
+        user.isEmailVerified = true;  // Set email as verified after successful OTP verification
         await user.save();
 
         // Generate JWT token
@@ -183,7 +184,8 @@ export const verifyOTP = async (req, res) => {
                 name: user.fullName,
                 gmail: user.gmail,
                 role,
-                userType
+                userType,
+                isEmailVerified: true  // Include in response
             }
         });
 
