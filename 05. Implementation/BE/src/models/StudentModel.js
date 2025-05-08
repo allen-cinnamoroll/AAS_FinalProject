@@ -86,6 +86,10 @@ const studentSchema = new mongoose.Schema({
         type: Date,
         default: null
     },
+    lastLogout: {
+        type: Date,
+        default: null
+    },
     otp: {
         code: {
             type: String,

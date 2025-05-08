@@ -46,6 +46,10 @@ const adminSchema = new mongoose.Schema(
     lastLogin: {
         type: Date,
         default: null
+    },
+    lastLogout: {
+        type: Date,
+        default: null
     }
   },
   { timestamps: true }

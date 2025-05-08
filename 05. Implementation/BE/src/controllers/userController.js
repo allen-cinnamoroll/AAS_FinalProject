@@ -5,10 +5,10 @@ import Instructor from '../models/Instructor.js';
 import StudentModel from '../models/StudentModel.js';
 
 const getPhilippineTime = () => {
-    // Create a date object
-    const now = new Date();
-    // Add 8 hours (UTC+8) in milliseconds
-    return new Date(now.getTime() + (8 * 60 * 60 * 1000));
+  // Create a date object
+  const now = new Date();
+  // Add 8 hours (UTC+8) in milliseconds
+  return new Date(now.getTime() + (8 * 60 * 60 * 1000));
 };
 
 export const findUser = async (req, res) => {
@@ -223,6 +223,46 @@ export const verifyOTP = async (req, res) => {
                 userType,
                 isEmailVerified: true  // Include in response
             }
+        });
+
+    } catch (error) {
+        res.status(500).json({
+            success: false,
+            message: error.message
+        });
+    }
+};
+
+export const logout = async (req, res) => {
+    try {
+        const userId = req.user.userId; // Get user ID from the token
+        const userType = req.user.userType; // Get user type from the token
+
+        // Find user based on type and ID
+        let user;
+        
+        if (userType === 'admin') {
+            user = await AdminModel.findById(userId);
+        } else if (userType === 'instructor') {
+            user = await Instructor.findById(userId);
+        } else if (userType === 'student') {
+            user = await StudentModel.findById(userId);
+        }
+
+        if (!user) {
+            return res.status(404).json({
+                success: false,
+                message: "User not found"
+            });
+        }
+
+        // Update lastLogout time
+        user.lastLogout = getPhilippineTime();
+        await user.save();
+
+        res.status(200).json({
+            success: true,
+            message: "Successfully logged out"
         });
 
     } catch (error) {
