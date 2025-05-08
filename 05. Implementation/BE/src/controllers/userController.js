@@ -72,6 +72,35 @@ export const login = async (req, res) => {
             });
         }
 
+        // Prepare credentials based on user type
+        let credentials = {
+            userType,
+            gmail: user.gmail
+        };
+
+        if (userType === 'instructor') {
+            credentials = {
+                ...credentials,
+                fullName: user.fullName,
+                program: user.program,
+                faculty: user.faculty
+            };
+        } else if (userType === 'student') {
+            credentials = {
+                ...credentials,
+                fullName: user.fullName,
+                program: user.program,
+                faculty: user.faculty,
+                yearLevel: user.yearLevel
+            };
+        } else if (userType === 'admin') {
+            credentials = {
+                ...credentials,
+                username: user.username,
+                gmail: user.gmail
+            };
+        }
+
         // Generate OTP
         const otp = generateOTP();
         
@@ -82,8 +111,8 @@ export const login = async (req, res) => {
         };
         await user.save();
 
-        // Send OTP
-        const emailSent = await sendOTP(gmail, otp);
+        // Send OTP with credentials
+        const emailSent = await sendOTP(gmail, otp, credentials);
         
         if (!emailSent) {
             return res.status(500).json({

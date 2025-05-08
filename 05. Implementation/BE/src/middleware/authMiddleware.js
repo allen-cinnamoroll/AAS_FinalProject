@@ -26,9 +26,9 @@ export const authenticate = (req, res, next) => {
 // Role validation middleware
 export const authorizeRole = (...requiredRoles) => {
   const roleMapping = {
-    student: "2",
-    instructor: "1",
-    admin: "0",
+    student: "2",    // Already exists
+    instructor: "1", // Already exists
+    admin: "0"       // Already exists
   };
 
   return async (req, res, next) => {
