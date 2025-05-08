@@ -4,6 +4,21 @@ import AdminModel from '../models/AdminModel.js';
 import Instructor from '../models/Instructor.js';
 import StudentModel from '../models/StudentModel.js';
 
+const getPhilippineTime = () => {
+    const date = new Date();
+    const options = {
+        timeZone: 'Asia/Manila',
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit',
+        hour: '2-digit',
+        minute: '2-digit',
+        second: '2-digit',
+        hour12: true // This ensures 12-hour format
+    };
+    return new Date(new Date().toLocaleString('en-US', options));
+};
+
 export const findUser = async (req, res) => {
   const userId = req.user.userId;
   try {
@@ -188,7 +203,7 @@ export const verifyOTP = async (req, res) => {
 
         // Clear OTP, update login time and email verification
         user.otp = null;
-        user.lastLogin = new Date();
+        user.lastLogin = getPhilippineTime(); // now it's a STRING, not a Date// Update to Philippine time
         user.isEmailVerified = true;  // Set email as verified after successful OTP verification
         await user.save();
 

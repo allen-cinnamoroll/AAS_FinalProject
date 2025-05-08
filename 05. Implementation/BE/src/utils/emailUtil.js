@@ -20,31 +20,38 @@ export const sendOTP = async (gmail, otp, credentials = {}) => {
         let credentialsHtml = '';
         if (credentials.userType === 'instructor') {
             credentialsHtml = `
-                <div class="credentials-section">
-                    <h3 style="color: #2c3e50; margin-bottom: 15px;">Instructor Information</h3>
-                    <p><strong>Full Name:</strong> ${credentials.fullName}</p>
-                    <p><strong>Program:</strong> ${credentials.program}</p>
-                    <p><strong>Faculty:</strong> ${credentials.faculty}</p>
-                    <p><strong>Role:</strong> Instructor</p>
+                <div class="credentials-section" style="text-align: center;">
+                    <h3 style="color: #2c3e50; margin-bottom: 15px; font-size: 18px;">Instructor Information</h3>
+                    <div style="display: inline-block; text-align: left; background-color: #f8f9fa; padding: 15px; border-radius: 5px; min-width: 250px;">
+                        <p style="margin: 8px 0;"><strong>Full Name:</strong> ${credentials.fullName}</p>
+                        <p style="margin: 8px 0;"><strong>Program:</strong> ${credentials.program}</p>
+                        <p style="margin: 8px 0;"><strong>Faculty:</strong> ${credentials.faculty}</p>
+                        <p style="margin: 8px 0;"><strong>Role:</strong> Instructor</p>
+                    </div>
                 </div>
             `;
         } else if (credentials.userType === 'student') {
             credentialsHtml = `
-                <div class="credentials-section">
-                    <h3 style="color: #2c3e50; margin-bottom: 15px;">Student Information</h3>
-                    <p><strong>Full Name:</strong> ${credentials.fullName}</p>
-                    <p><strong>Program:</strong> ${credentials.program}</p>
-                    <p><strong>Faculty:</strong> ${credentials.faculty}</p>
-                    <p><strong>Year Level:</strong> ${credentials.yearLevel}</p>
+                <div class="credentials-section" style="text-align: center;">
+                    <h3 style="color: #2c3e50; margin-bottom: 15px; font-size: 18px;">Student Information</h3>
+                    <div style="display: inline-block; text-align: left; background-color: #f8f9fa; padding: 15px; border-radius: 5px; min-width: 250px;">
+                        <p style="margin: 8px 0;"><strong>Full Name:</strong> ${credentials.fullName}</p>
+                        <p style="margin: 8px 0;"><strong>Program:</strong> ${credentials.program}</p>
+                        <p style="margin: 8px 0;"><strong>Faculty:</strong> ${credentials.faculty}</p>
+                        <p style="margin: 8px 0;"><strong>Year Level:</strong> ${credentials.yearLevel}</p>
+                        <p style="margin: 8px 0;"><strong>Role:</strong> Student</p>
+                    </div>
                 </div>
             `;
         } else if (credentials.userType === 'admin') {
             credentialsHtml = `
-                <div class="credentials-section">
-                    <h3 style="color: #2c3e50; margin-bottom: 15px;">Admin Information</h3>
-                    <p><strong>Username:</strong> ${credentials.username}</p>
-                    <p><strong>Gmail:</strong> ${credentials.gmail}</p>
-                    <p><strong>Role:</strong> Administrator</p>
+                <div class="credentials-section" style="text-align: center;">
+                    <h3 style="color: #2c3e50; margin-bottom: 15px; font-size: 18px;">Admin Information</h3>
+                    <div style="display: inline-block; text-align: left; background-color: #f8f9fa; padding: 15px; border-radius: 5px; min-width: 250px;">
+                        <p style="margin: 8px 0;"><strong>Username:</strong> ${credentials.username}</p>
+                        <p style="margin: 8px 0;"><strong>Gmail:</strong> ${credentials.gmail}</p>
+                        <p style="margin: 8px 0;"><strong>Role:</strong> Administrator</p>
+                    </div>
                 </div>
             `;
         }
@@ -75,8 +82,8 @@ export const sendOTP = async (gmail, otp, credentials = {}) => {
                     </div>
 
                     <div style="text-align: center; margin-top: 20px; padding-top: 20px; border-top: 1px solid #ddd; color: #7f8c8d; font-size: 12px;">
-                        <p>This is an automated message, please do not reply.</p>
-                        <p>If you didn't request this OTP, please ignore this email.</p>
+                        <p style="margin: 5px 0;">This is an automated message, please do not reply.</p>
+                        <p style="margin: 5px 0;">If you didn't request this OTP, please ignore this email.</p>
                     </div>
                 </div>
             `
