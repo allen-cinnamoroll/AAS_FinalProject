@@ -3,7 +3,7 @@ import { generateOTP, sendOTP } from '../utils/emailUtil.js';
 import StudentModel from '../models/StudentModel.js';
 
 export const loginStudent = async (req, res) => {
-    const { gmail, studentId } = req.body;
+    const { gmail, password } = req.body;  // Changed from studentId to password
 
     try {
         // Find student by gmail
@@ -12,15 +12,15 @@ export const loginStudent = async (req, res) => {
         if (!student) {
             return res.status(401).json({
                 success: false,
-                message: "Invalid gmail or student ID"
+                message: "Invalid gmail or password"
             });
         }
 
-        // Verify student ID
-        if (student.studentId !== studentId) {
+        // Verify password (initially their studentId)
+        if (student.password || student.studentId !== password) {
             return res.status(401).json({
                 success: false,
-                message: "Invalid gmail or student ID"
+                message: "Invalid gmail or password"
             });
         }
 

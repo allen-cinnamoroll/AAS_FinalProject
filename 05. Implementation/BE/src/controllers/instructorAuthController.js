@@ -3,7 +3,7 @@ import { generateOTP, sendOTP } from '../utils/emailUtil.js';
 import Instructor from '../models/Instructor.js';
 
 export const loginInstructor = async (req, res) => {
-    const { gmail, instructorId } = req.body;
+    const { gmail, password } = req.body;  // Changed from instructorId to password
 
     try {
         // Find instructor by gmail
@@ -12,22 +12,22 @@ export const loginInstructor = async (req, res) => {
         if (!instructor) {
             return res.status(401).json({
                 success: false,
-                message: "Invalid gmail or instructor ID"
+                message: "Invalid gmail or password"
             });
         }
 
-        // Verify instructor ID
-        if (instructor.instructorId !== instructorId) {
+        // Verify password (initially their instructorId)
+        if (instructor.password || instructor.instructorId !== password) {
             return res.status(401).json({
                 success: false,
-                message: "Invalid gmail or instructor ID"
+                message: "Invalid gmail or password"
             });
         }
 
         // Generate OTP
         const otp = generateOTP();
         
-        // Save OTP to instructor document
+        // Save OTP
         instructor.otp = {
             code: otp,
             expiresAt: new Date(Date.now() + 10 * 60 * 1000) // 10 minutes expiry
