@@ -5,13 +5,10 @@ import mongoose from "mongoose";
 import database from "./src/database/database.js";
 import dotenv from "dotenv";
 import instructorRoutes from './src/routes/instructor.js';
-import otpRoutes from './src/routes/otpRoutes.js';
-import instructorAuthRoutes from './src/routes/instructorAuth.js';
 import adminRoutes from './src/routes/admin.js';  // Updated import
 import fs from 'fs';
 import path from 'path';
 import studentRoutes from './src/routes/student.js';
-import studentAuthRoutes from './src/routes/studentAuth.js';
 import courseRoutes from './src/routes/course.js';
 import assignedCourseRoutes from './src/routes/assignedCourse.js';
 import enrollmentRoutes from './src/routes/enrollment.js';
@@ -49,10 +46,7 @@ database.on("error", console.error.bind(console, "MongoDB connection error:"));
 
 // API routes
 app.use('/api/instructors', instructorRoutes);
-app.use('/api/otp', otpRoutes);
-app.use('/api/instructor-auth', instructorAuthRoutes);
 app.use('/api/students', studentRoutes);
-app.use('/api/student-auth', studentAuthRoutes);
 app.use('/api/courses', courseRoutes);
 app.use('/api/assigned-courses', assignedCourseRoutes);
 app.use('/api/enrollments', enrollmentRoutes);

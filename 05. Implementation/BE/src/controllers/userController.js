@@ -28,23 +28,23 @@ export const findUser = async (req, res) => {
 };
 
 export const login = async (req, res) => {
-    const { gmail, password } = req.body;
-
     try {
-        // Check in Admin collection
-        let user = await AdminModel.findOne({ gmail });
-        let role = "0";
+        const { gmail, password } = req.body;
 
-        // If not admin, check in Instructor collection
+        // Check in Admin collection first
+        let user = await AdminModel.findOne({ gmail });
+        let userType = 'admin';
+
+        // If not admin, check instructor
         if (!user) {
             user = await Instructor.findOne({ gmail });
-            role = "1";
+            userType = 'instructor';
         }
 
-        // If not instructor, check in Student collection
+        // If not instructor, check student
         if (!user) {
             user = await StudentModel.findOne({ gmail });
-            role = "2";
+            userType = 'student';
         }
 
         if (!user) {
@@ -54,14 +54,15 @@ export const login = async (req, res) => {
             });
         }
 
-        // Verify password based on role
+        // Verify password based on user type
         let isValidPassword = false;
-        if (role === "0") {
+
+        if (userType === 'admin') {
             isValidPassword = await user.comparePassword(password);
-        } else if (role === "1") {
-            isValidPassword = user.instructorId === password;
-        } else if (role === "2") {
-            isValidPassword = user.studentId === password;
+        } else if (userType === 'instructor') {
+            isValidPassword = password === user.instructorId;
+        } else {
+            isValidPassword = password === user.studentId;
         }
 
         if (!isValidPassword) {
@@ -77,11 +78,11 @@ export const login = async (req, res) => {
         // Save OTP
         user.otp = {
             code: otp,
-            expiresAt: new Date(Date.now() + 10 * 60 * 1000) // 10 minutes expiry
+            expiresAt: new Date(Date.now() + 10 * 60 * 1000)
         };
         await user.save();
 
-        // Send OTP via email
+        // Send OTP
         const emailSent = await sendOTP(gmail, otp);
         
         if (!emailSent) {
@@ -94,7 +95,7 @@ export const login = async (req, res) => {
         res.status(200).json({
             success: true,
             message: "OTP sent to your email",
-            role: role // Include role in response
+            userType
         });
 
     } catch (error) {
@@ -106,36 +107,36 @@ export const login = async (req, res) => {
 };
 
 export const verifyOTP = async (req, res) => {
-    const { gmail, otp } = req.body;
-
     try {
-        // Check each collection for the user
-        let user;
-        let role;
-        let Model;
+        const { gmail, otp } = req.body;
 
-        // Try Admin
+        // Try to find user in each collection
+        let user;
+        let userType;
+        let role;
+
+        // Check Admin
         user = await AdminModel.findOne({ gmail });
         if (user) {
-            role = "0";
-            Model = AdminModel;
+            userType = 'admin';
+            role = '0';
         }
 
-        // Try Instructor
+        // Check Instructor
         if (!user) {
             user = await Instructor.findOne({ gmail });
             if (user) {
-                role = "1";
-                Model = Instructor;
+                userType = 'instructor';
+                role = '1';
             }
         }
 
-        // Try Student
+        // Check Student
         if (!user) {
             user = await StudentModel.findOne({ gmail });
             if (user) {
-                role = "2";
-                Model = StudentModel;
+                userType = 'student';
+                role = '2';
             }
         }
 
@@ -156,10 +157,8 @@ export const verifyOTP = async (req, res) => {
             });
         }
 
-        // Clear OTP
+        // Clear OTP and update login time
         user.otp = null;
-        
-        // Update last login
         user.lastLogin = new Date();
         await user.save();
 
@@ -168,10 +167,11 @@ export const verifyOTP = async (req, res) => {
             {
                 userId: user._id,
                 gmail: user.gmail,
-                role: role
+                role,
+                userType
             },
             process.env.ACCESS_TOKEN_SECRET,
-            { expiresIn: process.env.ACCESS_TOKEN_EXPIRATION || '1d' }
+            { expiresIn: '1d' }
         );
 
         res.status(200).json({
@@ -182,7 +182,8 @@ export const verifyOTP = async (req, res) => {
                 id: user._id,
                 name: user.fullName,
                 gmail: user.gmail,
-                role: role
+                role,
+                userType
             }
         });
 
