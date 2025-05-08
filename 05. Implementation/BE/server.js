@@ -15,6 +15,7 @@ import studentAuthRoutes from './src/routes/studentAuth.js';
 import courseRoutes from './src/routes/course.js';
 import assignedCourseRoutes from './src/routes/assignedCourse.js';
 import enrollmentRoutes from './src/routes/enrollment.js';
+import authRoutes from './src/routes/auth.js';
 
 //Load environment variables from .env file
 dotenv.config();
@@ -56,6 +57,7 @@ app.use('/api/courses', courseRoutes);
 app.use('/api/assigned-courses', assignedCourseRoutes);
 app.use('/api/enrollments', enrollmentRoutes);
 app.use('/api/admin', adminRoutes);  // This maps all admin routes to /api/admin/*
+app.use('/api/auth', authRoutes);
 
 const server = http.createServer(app);
 //server port
