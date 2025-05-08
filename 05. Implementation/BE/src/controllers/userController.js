@@ -5,18 +5,10 @@ import Instructor from '../models/Instructor.js';
 import StudentModel from '../models/StudentModel.js';
 
 const getPhilippineTime = () => {
-    const date = new Date();
-    const options = {
-        timeZone: 'Asia/Manila',
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit',
-        hour: '2-digit',
-        minute: '2-digit',
-        second: '2-digit',
-        hour12: true // This ensures 12-hour format
-    };
-    return new Date(new Date().toLocaleString('en-US', options));
+    // Create a date object
+    const now = new Date();
+    // Add 8 hours (UTC+8) in milliseconds
+    return new Date(now.getTime() + (8 * 60 * 60 * 1000));
 };
 
 export const findUser = async (req, res) => {
