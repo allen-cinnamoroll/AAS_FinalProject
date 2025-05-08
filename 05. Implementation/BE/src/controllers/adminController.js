@@ -1,5 +1,5 @@
 import jwt from 'jsonwebtoken';
-import UserModel from '../models/AdminModel.js';
+import AdminModel from '../models/AdminModel.js';
 import bcrypt from 'bcryptjs';
 import dotenv from 'dotenv';
 
@@ -10,36 +10,42 @@ const REFRESH_KEY = process.env.REFRESH_TOKEN_SECRET;
 const REFRESH_EXPIRATION = process.env.REFRESH_TOKEN_EXPIRATION || '7d';
 
 export const register = async (req, res) => {
-    const { username, gmail, password, role } = req.body;
     try {
-        const userExists = await UserModel.findOne({
-            $or: [{ username }, { gmail }],
+        const { username, gmail, password } = req.body;
+
+        // Check if admin already exists
+        const adminExists = await AdminModel.findOne({
+            $or: [{ username }, { gmail }]
         });
 
-        if (userExists) {
+        if (adminExists) {
             return res.status(400).json({
                 success: false,
-                message: userExists.username === username
+                message: adminExists.username === username
                     ? "Username already taken"
-                    : "Email already taken",
+                    : "Gmail already taken"
             });
         }
 
-        await UserModel.create({
+        // Create new admin
+        const newAdmin = new AdminModel({
             username,
             gmail,
             password,
             role: "0"
         });
 
-        res.status(200).json({
+        await newAdmin.save();
+
+        res.status(201).json({
             success: true,
-            message: "User registered successfully",
+            message: "Admin registered successfully"
         });
-    } catch (err) {
-        return res.status(500).json({
+
+    } catch (error) {
+        res.status(500).json({
             success: false,
-            message: err.message,
+            message: error.message
         });
     }
 };
@@ -48,7 +54,7 @@ export const login = async (req, res) => {
     const { gmail, password } = req.body;
 
     try {
-        const user = await UserModel.findOne({
+        const user = await AdminModel.findOne({
             $or: [{ gmail }, { username: gmail }]
         });
 
@@ -132,7 +138,7 @@ export const refreshAccessToken = async (req, res, next) => {
         }
 
         try {
-            const currentUser = await UserModel.findById(user.userId);
+            const currentUser = await AdminModel.findById(user.userId);
 
             if (!currentUser) {
                 const error = new Error("User not found");
