@@ -110,6 +110,10 @@ const studentSchema = new mongoose.Schema({
     toObject: { virtuals: true }
 });
 
+// Add indexes
+studentSchema.index({ studentId: 1 }, { unique: true });
+studentSchema.index({ gmail: 1 }, { unique: true });
+
 // Virtual for full name
 studentSchema.virtual('fullName').get(function() {
     const middleInitial = this.middleName ? `${this.middleName.charAt(0)}. ` : '';

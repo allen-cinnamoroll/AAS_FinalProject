@@ -1,5 +1,5 @@
 import mongoose from 'mongoose';
-import UserModel from './models/UserModel.js';
+import AdminModel from './models/AdminModel.js';
 import bcrypt from 'bcryptjs';
 import dotenv from 'dotenv';
 
@@ -16,11 +16,11 @@ const initAdmin = async () => {
         const hashedPassword = await bcrypt.hash('lagangga123', salt);
 
         // Find and update the existing admin user
-        const updatedAdmin = await UserModel.findOneAndUpdate(
+        const updatedAdmin = await AdminModel.findOneAndUpdate(
             { role: '0' },
             {
                 username: 'allen',
-                email: 'allenjeanlagangga0217@gmail.com',
+                gmail: 'allenjeanlagangga0217@gmail.com',
                 password: hashedPassword,
                 isEmailVerified: true
             },
@@ -28,7 +28,7 @@ const initAdmin = async () => {
         );
 
         if (updatedAdmin) {
-            console.log('Admin user updated successfully:', updatedAdmin.email);
+            console.log('Admin user updated successfully:', updatedAdmin.gmail);
         } else {
             console.log('No admin user found to update');
         }
@@ -40,4 +40,4 @@ const initAdmin = async () => {
     }
 };
 
-initAdmin(); 
+initAdmin();
