@@ -100,6 +100,10 @@ const studentSchema = new mongoose.Schema({
             default: null
         }
     },
+    isEmailVerified: {
+        type: Boolean,
+        default: false
+    },
     idPhoto: {
         type: photoSchema,
         required: [true, "ID photo is required"]
@@ -109,8 +113,6 @@ const studentSchema = new mongoose.Schema({
     toJSON: { virtuals: true },
     toObject: { virtuals: true }
 });
-
-
 
 // Virtual for full name
 studentSchema.virtual('fullName').get(function() {
