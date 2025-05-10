@@ -8,7 +8,7 @@ import {
 } from '../controllers/studentController.js';
 import { authenticate, authorizeRole } from '../middleware/authMiddleware.js';
 import { studentValidationRules, validate, photoValidation } from '../middleware/validator.js';
-import upload from '../middleware/upload.js';
+import { uploadStudent } from '../middleware/upload.js';
 
 const router = express.Router();
 
@@ -16,7 +16,7 @@ const router = express.Router();
 router.post('/register',
     authenticate,
     authorizeRole('admin'),
-    upload.single('idPhoto'),
+    uploadStudent.single('idPhoto'),
     studentValidationRules(),
     validate,
     photoValidation,
@@ -41,7 +41,7 @@ router.get('/:id',
 router.put('/:id',
     authenticate,
     authorizeRole('admin'),
-    upload.single('idPhoto'),
+    uploadStudent.single('idPhoto'),
     studentValidationRules(),
     validate,
     photoValidation,

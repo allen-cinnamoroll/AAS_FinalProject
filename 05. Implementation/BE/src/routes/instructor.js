@@ -8,7 +8,7 @@ import {
 } from '../controllers/instructorController.js';
 import { authenticate, authorizeRole } from '../middleware/authMiddleware.js';
 import { instructorValidationRules, validate, photoValidation } from '../middleware/validator.js';
-import upload from '../middleware/upload.js';
+import { uploadInstructor } from '../middleware/upload.js';
 
 const router = express.Router();
 
@@ -16,7 +16,7 @@ const router = express.Router();
 router.post('/register',
     authenticate, // Verify JWT token
     authorizeRole('admin'), // Only admin can register instructors
-    upload.single('idPhoto'), // Handle photo upload
+    uploadInstructor.single('idPhoto'), // Changed from 'photo' to 'idPhoto'
     instructorValidationRules(), // Validate input fields
     validate, // Handle validation errors
     photoValidation, // Validate photo
@@ -41,10 +41,10 @@ router.get('/:id',
 router.put('/:id',
     authenticate,
     authorizeRole('admin'),
-    upload.single('idPhoto'), // Photo upload becomes optional
+    uploadInstructor.single('idPhoto'), // Already correct
     instructorValidationRules(),
     validate,
-    photoValidation, // Now handles optional photo
+    photoValidation,
     updateInstructor
 );
 
