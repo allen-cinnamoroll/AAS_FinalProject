@@ -2,6 +2,9 @@ import jwt from 'jsonwebtoken';
 import AdminModel from '../models/AdminModel.js';
 import bcrypt from 'bcryptjs';
 import dotenv from 'dotenv';
+import StudentModel from '../models/StudentModel.js';
+import InstructorModel from '../models/Instructor.js';
+import { generateVerificationToken, sendVerificationEmail } from '../utils/emailUtil.js';
 
 dotenv.config();
 const ACCESS_KEY = process.env.ACCESS_TOKEN_SECRET;
@@ -27,12 +30,13 @@ export const register = async (req, res) => {
             });
         }
 
-        // Create new admin
+        // Create new admin with email verified by default
         const newAdmin = new AdminModel({
             username,
             gmail,
             password,
-            role: "0"
+            role: "0",
+            isEmailVerified: true // Set email as verified by default for admin
         });
 
         await newAdmin.save();
@@ -172,4 +176,105 @@ export const refreshAccessToken = async (req, res, next) => {
             return next(error);
         }
     });
+};
+
+export const registerStudent = async (req, res) => {
+    try {
+        const {
+            fullName,
+            gmail,
+            password,
+            program,
+            faculty,
+            yearLevel
+        } = req.body;
+
+        // Check if student already exists
+        const existingStudent = await StudentModel.findOne({ gmail });
+        if (existingStudent) {
+            return res.status(400).json({
+                success: false,
+                message: 'Student with this email already exists'
+            });
+        }
+
+        // Create new student with email verified by default
+        const student = new StudentModel({
+            fullName,
+            gmail,
+            password,
+            program,
+            faculty,
+            yearLevel,
+            isVerified: true // Set as verified by default
+        });
+
+        await student.save();
+
+        res.status(201).json({
+            success: true,
+            message: 'Student registered successfully'
+        });
+    } catch (error) {
+        console.error('Error registering student:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error registering student'
+        });
+    }
+};
+
+export const registerInstructor = async (req, res) => {
+    try {
+        const {
+            fullName,
+            gmail,
+            password,
+            program,
+            faculty
+        } = req.body;
+
+        // Check if instructor already exists
+        const existingInstructor = await InstructorModel.findOne({ gmail });
+        if (existingInstructor) {
+            return res.status(400).json({
+                success: false,
+                message: 'Instructor with this email already exists'
+            });
+        }
+
+        // Generate verification token
+        const verificationToken = generateVerificationToken();
+
+        // Create new instructor
+        const instructor = new InstructorModel({
+            fullName,
+            gmail,
+            password, // Note: Make sure password is hashed in the model
+            program,
+            faculty,
+            verificationToken,
+            isVerified: false
+        });
+
+        await instructor.save();
+
+        // Send verification email
+        await sendVerificationEmail(gmail, verificationToken, 'instructor', {
+            fullName,
+            program,
+            faculty
+        });
+
+        res.status(201).json({
+            success: true,
+            message: 'Instructor registered successfully. Verification email has been sent.'
+        });
+    } catch (error) {
+        console.error('Error registering instructor:', error);
+        res.status(500).json({
+            success: false,
+            message: 'Error registering instructor'
+        });
+    }
 };

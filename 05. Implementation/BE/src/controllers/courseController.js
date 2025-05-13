@@ -59,23 +59,30 @@ const getAllCourses = async (req, res) => {
 
 const getCourseById = async (req, res) => {
     try {
-        const course = await CourseModel.findById(req.params.id);
+        const { id } = req.params;
+        console.log(`Getting course details for ID: ${id}`);
+        
+        const course = await CourseModel.findById(id);
         
         if (!course) {
+            console.log(`Course not found with ID: ${id}`);
             return res.status(404).json({
                 success: false,
                 message: "Course not found"
             });
         }
-
+        
+        console.log(`Found course: ${course.courseId} - ${course.description}`);
+        
         res.status(200).json({
             success: true,
             data: course
         });
     } catch (error) {
+        console.error(`Error getting course by ID: ${error.message}`);
         res.status(500).json({
             success: false,
-            message: "Error fetching course",
+            message: "Error retrieving course",
             error: error.message
         });
     }

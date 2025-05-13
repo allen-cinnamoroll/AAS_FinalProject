@@ -29,6 +29,7 @@ router.get('/',
 // GET - Get course by ID
 router.get('/:id',
     authenticate,
+    authorizeRole('admin'),
     getCourseById
 );
 

@@ -4,7 +4,8 @@ import {
     getStudentEnrollments,
     getInstructorEnrollments,
     getAllEnrollments,
-    deleteEnrollment
+    deleteEnrollment,
+    getEnrollmentsBySection
 } from '../controllers/enrollmentController.js';
 import { authenticate, authorizeRole } from '../middleware/authMiddleware.js';
 
@@ -17,32 +18,39 @@ router.post('/enroll',
     enrollStudent
 );
 
-// Student can only view their enrollments
-router.get('/my-enrollments',
+// Get all enrollments (admin only)
+router.get('/',
     authenticate,
-    authorizeRole('2'),
-    getStudentEnrollments
+    authorizeRole('admin'),
+    getAllEnrollments
 );
 
-// Delete enrollment (Admin only)
+// Get enrollments by section (admin only)
+router.get('/section/:sectionId',
+    authenticate,
+    authorizeRole('admin'),
+    getEnrollmentsBySection
+);
+
+// Delete enrollment (admin only)
 router.delete('/:id',
     authenticate,
     authorizeRole('admin'),
     deleteEnrollment
 );
 
-// Instructor routes
-router.get('/instructor-enrollments',
+// Student routes
+router.get('/my-enrollments',
     authenticate,
-    authorizeRole('1'),
-    getInstructorEnrollments
+    authorizeRole('student'),
+    getStudentEnrollments
 );
 
-// Admin routes
-router.get('/all',
+// Instructor routes
+router.get('/teaching',
     authenticate,
-    authorizeRole('admin'),
-    getAllEnrollments
+    authorizeRole('instructor'),
+    getInstructorEnrollments
 );
 
 export default router;

@@ -123,4 +123,21 @@ studentSchema.virtual('fullName').get(function() {
 
 const StudentModel = mongoose.model("Student", studentSchema);
 
+// Drop any existing indexes and create new ones
+StudentModel.collection.dropIndexes()
+    .then(() => {
+        console.log('Dropped all indexes from students collection');
+        // Create new indexes
+        return StudentModel.collection.createIndexes([
+            { key: { studentId: 1 }, unique: true },
+            { key: { gmail: 1 }, unique: true }
+        ]);
+    })
+    .then(() => {
+        console.log('Created new indexes for students collection');
+    })
+    .catch(error => {
+        console.error('Error managing indexes:', error);
+    });
+
 export default StudentModel;

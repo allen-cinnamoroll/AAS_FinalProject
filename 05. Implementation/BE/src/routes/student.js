@@ -1,14 +1,14 @@
 import express from 'express';
 import { 
-    registerStudent, 
-    getAllStudents, 
-    getStudentById, 
-    updateStudent, 
-    deleteStudent 
+    registerStudent,
+    getAllStudents,
+    getStudentById,
+    updateStudent,
+    deleteStudent,
+    getStudentCourses
 } from '../controllers/studentController.js';
 import { authenticate, authorizeRole } from '../middleware/authMiddleware.js';
-import { studentValidationRules, validate, photoValidation } from '../middleware/validator.js';
-import upload from '../middleware/upload.js';
+import { studentValidationRules, validate, photoValidation, uploadStudent } from '../middleware/validator.js';
 
 const router = express.Router();
 
@@ -16,7 +16,7 @@ const router = express.Router();
 router.post('/register',
     authenticate,
     authorizeRole('admin'),
-    upload.single('idPhoto'),
+    uploadStudent.single('idPhoto'),
     studentValidationRules(),
     validate,
     photoValidation,
@@ -26,14 +26,14 @@ router.post('/register',
 // GET - Get all students (Protected)
 router.get('/',
     authenticate,
-    authorizeRole('admin'),
+    authorizeRole('admin', 'instructor'),
     getAllStudents
 );
 
 // GET - Get student by ID (Protected)
 router.get('/:id',
     authenticate,
-    authorizeRole('admin'),
+    authorizeRole('admin', 'instructor', 'student'),
     getStudentById
 );
 
@@ -41,7 +41,7 @@ router.get('/:id',
 router.put('/:id',
     authenticate,
     authorizeRole('admin'),
-    upload.single('idPhoto'),
+    uploadStudent.single('idPhoto'),
     studentValidationRules(),
     validate,
     photoValidation,
@@ -55,4 +55,11 @@ router.delete('/:id',
     deleteStudent
 );
 
-export default router;
+// GET - Get student's courses (Protected)
+router.get('/courses',
+    authenticate,
+    authorizeRole('student'),
+    getStudentCourses
+);
+
+export default router; 

@@ -79,6 +79,42 @@ export const login = async (req, res) => {
             });
         }
 
+        // Check if email is already verified
+        if (user.isEmailVerified) {
+            // Generate JWT token
+            const token = jwt.sign(
+                {
+                    userId: user._id,
+                    gmail: user.gmail,
+                    role: user.role,
+                    userType
+                },
+                process.env.ACCESS_TOKEN_SECRET,
+                { expiresIn: '1d' }
+            );
+
+            // Update last login time
+            user.lastLogin = getPhilippineTime();
+            await user.save();
+
+            return res.status(200).json({
+                success: true,
+                message: "Login successful",
+                token,
+                data: {
+                    id: user._id,
+                    name: user.fullName || user.username,
+                    gmail: user.gmail,
+                    role: user.role,
+                    userType,
+                    isEmailVerified: true
+                }
+            });
+        }
+
+        // If email is not verified, proceed with OTP verification
+        console.log('Email not verified, proceeding with OTP verification');
+        
         // Prepare credentials based on user type
         let credentials = {
             userType,
@@ -108,8 +144,11 @@ export const login = async (req, res) => {
             };
         }
 
+        console.log('Prepared credentials:', credentials);
+
         // Generate OTP
         const otp = generateOTP();
+        console.log('Generated OTP:', otp);
         
         // Save OTP
         user.otp = {
@@ -117,11 +156,15 @@ export const login = async (req, res) => {
             expiresAt: new Date(Date.now() + 10 * 60 * 1000)
         };
         await user.save();
+        console.log('Saved OTP to user document');
 
         // Send OTP with credentials
+        console.log('Attempting to send OTP email to:', gmail);
         const emailSent = await sendOTP(gmail, otp, credentials);
+        console.log('Email sent status:', emailSent);
         
         if (!emailSent) {
+            console.error('Failed to send OTP email');
             return res.status(500).json({
                 success: false,
                 message: "Failed to send OTP"
@@ -203,6 +246,7 @@ export const verifyOTP = async (req, res) => {
         const token = jwt.sign(
             {
                 userId: user._id,
+                _id: user._id, // Add _id as an alias for userId for compatibility
                 gmail: user.gmail,
                 role,
                 userType

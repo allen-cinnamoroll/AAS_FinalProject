@@ -17,12 +17,23 @@ const enrollStudent = async (req, res) => {
             });
         }
 
-        // Create enrollment using values from assignedCourse
+        // Check if student is already enrolled in this course
+        const existingEnrollment = await EnrollmentModel.findOne({
+            student: studentId,
+            assignedCourse: assignedCourseId
+        });
+
+        if (existingEnrollment) {
+            return res.status(400).json({
+                success: false,
+                message: "Student is already enrolled in this course"
+            });
+        }
+
+        // Create enrollment
         const enrollment = new EnrollmentModel({
             student: studentId,
-            assignedCourse: assignedCourseId,
-            academicYear: assignedCourse.academicYear,  // Gets academicYear from assignedCourse
-            semester: assignedCourse.semester           // Gets semester from assignedCourse
+            assignedCourse: assignedCourseId
         });
 
         await enrollment.save();
@@ -45,6 +56,7 @@ const enrollStudent = async (req, res) => {
         });
 
     } catch (error) {
+        console.error('Enrollment error:', error);
         res.status(500).json({
             success: false,
             message: "Error enrolling student",
@@ -163,10 +175,53 @@ const deleteEnrollment = async (req, res) => {
     }
 };
 
+// Get all enrollments for a specific section
+const getEnrollmentsBySection = async (req, res) => {
+    try {
+        const sectionId = req.params.sectionId;
+        
+        // Validate that the section (assigned course) exists
+        const sectionExists = await AssignedCourseModel.findById(sectionId);
+        if (!sectionExists) {
+            return res.status(404).json({
+                success: false,
+                message: "Section not found"
+            });
+        }
+        
+        // Find all enrollments for this section
+        const enrollments = await EnrollmentModel.find({ 
+            assignedCourse: sectionId 
+        })
+        .populate('student')
+        .populate({
+            path: 'assignedCourse',
+            populate: [
+                { path: 'course' },
+                { path: 'instructor' }
+            ]
+        });
+        
+        res.status(200).json({
+            success: true,
+            count: enrollments.length,
+            data: enrollments
+        });
+    } catch (error) {
+        console.error('Error fetching section enrollments:', error);
+        res.status(500).json({
+            success: false,
+            message: "Error fetching enrollments for this section",
+            error: error.message
+        });
+    }
+};
+
 export {
     enrollStudent,
     getStudentEnrollments,
     getInstructorEnrollments,
     getAllEnrollments,
-    deleteEnrollment
+    deleteEnrollment,
+    getEnrollmentsBySection
 };

@@ -1,5 +1,18 @@
 import mongoose from "mongoose";
 
+const attendanceSchema = new mongoose.Schema({
+    percentage: {
+        type: Number,
+        default: 0,
+        min: 0,
+        max: 100
+    },
+    lastUpdated: {
+        type: Date,
+        default: Date.now
+    }
+});
+
 const enrollmentSchema = new mongoose.Schema({
     student: {
         type: mongoose.Schema.Types.ObjectId,
@@ -11,10 +24,18 @@ const enrollmentSchema = new mongoose.Schema({
         ref: 'AssignedCourse',
         required: [true, "Assigned course is required"]
     },
+    section: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: 'Section'
+    },
     enrollmentDate: {
         type: Date,
         default: Date.now
     },
+    attendance: {
+        type: attendanceSchema,
+        default: () => ({})
+    }
 }, {
     timestamps: true
 });
@@ -29,6 +50,14 @@ enrollmentSchema.index(
     }, 
     { unique: true }
 );
+
+// Update the attendance.lastUpdated timestamp when attendance is modified
+enrollmentSchema.pre('save', function(next) {
+    if (this.isModified('attendance.percentage')) {
+        this.attendance.lastUpdated = new Date();
+    }
+    next();
+});
 
 const EnrollmentModel = mongoose.model("Enrollment", enrollmentSchema);
 
