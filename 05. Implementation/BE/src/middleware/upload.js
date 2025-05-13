@@ -20,23 +20,10 @@ const createUploadDirs = () => {
 // Call createUploadDirs immediately
 createUploadDirs();
 
-// Configure multer for file upload
-const storage = multer.diskStorage({
+// Configure storage for instructor photos
+const instructorStorage = multer.diskStorage({
     destination: (req, file, cb) => {
-        try {
-            // Determine if this is a student or instructor upload based on the route
-            const isStudent = req.originalUrl.includes('/students/');
-            const uploadDir = isStudent ? 'uploads/student-photos' : 'uploads/instructor-photos';
-            
-            // Ensure directory exists
-            if (!fs.existsSync(uploadDir)) {
-                fs.mkdirSync(uploadDir, { recursive: true });
-            }
-            
-            cb(null, uploadDir);
-        } catch (error) {
-            cb(error);
-        }
+        cb(null, 'uploads/instructor-photos'); // Make sure this directory exists
     },
     filename: (req, file, cb) => {
         try {
@@ -47,6 +34,17 @@ const storage = multer.diskStorage({
         } catch (error) {
             cb(error);
         }
+    }
+});
+
+// Configure storage for student photos
+const studentStorage = multer.diskStorage({
+    destination: (req, file, cb) => {
+        cb(null, 'uploads/student-photos'); // New directory for student photos
+    },
+    filename: (req, file, cb) => {
+        const uniqueSuffix = Date.now() + '-' + Math.round(Math.random() * 1E9);
+        cb(null, 'student-' + uniqueSuffix + path.extname(file.originalname));
     }
 });
 
@@ -81,12 +79,30 @@ const handleMulterError = (err, req, res, next) => {
     next(err);
 };
 
-const upload = multer({
-    storage: storage,
+// Create separate upload instances
+const uploadInstructor = multer({
+    storage: instructorStorage,
     fileFilter: fileFilter,
     limits: {
         fileSize: 5 * 1024 * 1024 // 5MB limit
     }
 });
+
+const uploadStudent = multer({
+    storage: studentStorage,
+    fileFilter: fileFilter,
+    limits: {
+        fileSize: 5 * 1024 * 1024 // 5MB limit
+    }
+});
+
+// Export both as named exports
+export { uploadInstructor, uploadStudent };
+
+// Also export as default object
+const upload = {
+    instructor: uploadInstructor,
+    student: uploadStudent
+};
 
 export { upload, handleMulterError };
