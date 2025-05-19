@@ -3,9 +3,9 @@ import mongoose from "mongoose";
 
 dotenv.config();
 
-const { NODE_ENV, DATABASE, DATABASE_LOCAL, DB_PASSWORD } = process.env;
+const { NODE_ENV, DATABASE, CLOUD_DATABASE, DB_PASSWORD } = process.env;
 
-if (!NODE_ENV || (!DATABASE_LOCAL && !DATABASE)) {
+if (!NODE_ENV || (!CLOUD_DATABASE && !DATABASE)) {
   console.error(
     "Missing required environment variables for database connection."
   );
@@ -15,10 +15,23 @@ if (!NODE_ENV || (!DATABASE_LOCAL && !DATABASE)) {
 const DB_URI =
   NODE_ENV === "production"
     ? DATABASE.replace("<PASSWORD>", DB_PASSWORD)
-    : DATABASE_LOCAL;
+    : CLOUD_DATABASE;
+
+// Configure mongoose options
+mongoose.set('strictQuery', false);
+
+const options = {
+  serverSelectionTimeoutMS: 30000, // Increase timeout to 30 seconds
+  socketTimeoutMS: 45000, // Increase socket timeout
+  connectTimeoutMS: 30000, // Increase connection timeout
+  maxPoolSize: 10, // Maximum number of connections in the pool
+  minPoolSize: 5, // Minimum number of connections in the pool
+  retryWrites: true,
+  retryReads: true
+};
 
 mongoose
-  .connect(DB_URI)
+  .connect(DB_URI, options)
   .then(() => {
     console.log(`${NODE_ENV} DB connected successfully`);
   })

@@ -59,6 +59,27 @@ enrollmentSchema.pre('save', function(next) {
     next();
 });
 
+// Middleware to handle post-population fixes
+enrollmentSchema.post('find', function(docs) {
+    if (Array.isArray(docs)) {
+        docs.forEach(doc => {
+            if (doc.assignedCourse && doc.assignedCourse.course) {
+                // Ensure courseCode is set
+                if (!doc.assignedCourse.course.courseCode) {
+                    doc.assignedCourse.course.courseCode = 
+                        doc.assignedCourse.course.courseId || 'ITC-Default';
+                }
+                
+                // Ensure courseName is set
+                if (!doc.assignedCourse.course.courseName) {
+                    doc.assignedCourse.course.courseName = 
+                        doc.assignedCourse.course.description || 'Unknown Course';
+                }
+            }
+        });
+    }
+});
+
 const EnrollmentModel = mongoose.model("Enrollment", enrollmentSchema);
 
 export default EnrollmentModel;

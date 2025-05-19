@@ -38,6 +38,20 @@ router.get('/courses',
     getInstructorCourses
 );
 
+// PUT - Update instructor's own profile (Protected - Instructors can update their own profile)
+router.put('/update-profile',
+    authenticate,
+    authorizeRole('instructor'),
+    (req, res, next) => {
+        console.log('Received request to update-profile route');
+        console.log('User ID from token:', req.user?.userId);
+        console.log('User role from token:', req.user?.role);
+        console.log('Request body:', req.body);
+        next();
+    },
+    updateInstructor
+);
+
 // GET - Get instructor by ID (Protected)
 router.get('/:id',
     authenticate,

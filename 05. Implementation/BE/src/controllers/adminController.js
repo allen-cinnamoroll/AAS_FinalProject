@@ -16,6 +16,14 @@ export const register = async (req, res) => {
     try {
         const { username, gmail, password } = req.body;
 
+        // Validate required fields
+        if (!username || !gmail || !password) {
+            return res.status(400).json({
+                success: false,
+                message: "All fields are required"
+            });
+        }
+
         // Check if admin already exists
         const adminExists = await AdminModel.findOne({
             $or: [{ username }, { gmail }]
@@ -30,26 +38,37 @@ export const register = async (req, res) => {
             });
         }
 
-        // Create new admin with email verified by default
+        // Generate verification token
+        const verificationToken = generateVerificationToken();
+
+        // Create new admin
         const newAdmin = new AdminModel({
             username,
             gmail,
             password,
             role: "0",
-            isEmailVerified: true // Set email as verified by default for admin
+            isEmailVerified: false,
+            verificationToken
         });
 
         await newAdmin.save();
 
+        // Send verification email
+        await sendVerificationEmail(gmail, verificationToken, 'admin', {
+            username,
+            gmail
+        });
+
         res.status(201).json({
             success: true,
-            message: "Admin registered successfully"
+            message: "Admin registered successfully. Please check your email for verification."
         });
 
     } catch (error) {
+        console.error('Registration error:', error);
         res.status(500).json({
             success: false,
-            message: error.message
+            message: error.message || "Error registering admin"
         });
     }
 };

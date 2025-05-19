@@ -31,6 +31,27 @@ router.get('/',
     getAllStudents
 );
 
+// GET - Get student courses (Protected)
+router.get('/courses',
+    authenticate,
+    authorizeRole('student'),
+    getStudentCourses
+);
+
+// PUT - Update student's own profile (Protected - Students can update their own profile)
+router.put('/update-profile',
+    authenticate,
+    authorizeRole('student'),
+    (req, res, next) => {
+        console.log('Received request to update student profile');
+        console.log('User ID from token:', req.user?.userId);
+        console.log('User role from token:', req.user?.role);
+        console.log('Request body:', req.body);
+        next();
+    },
+    updateStudent
+);
+
 // GET - Get student by ID (Protected)
 router.get('/:id',
     authenticate,
@@ -54,13 +75,6 @@ router.delete('/:id',
     authenticate,
     authorizeRole('admin'),
     deleteStudent
-);
-
-// GET - Get student's courses (Protected)
-router.get('/courses',
-    authenticate,
-    authorizeRole('student'),
-    getStudentCourses
 );
 
 export default router; 

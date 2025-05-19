@@ -123,21 +123,22 @@ studentSchema.virtual('fullName').get(function() {
 
 const StudentModel = mongoose.model("Student", studentSchema);
 
-// Drop any existing indexes and create new ones
-StudentModel.collection.dropIndexes()
-    .then(() => {
-        console.log('Dropped all indexes from students collection');
-        // Create new indexes
-        return StudentModel.collection.createIndexes([
+// Create indexes with error handling
+const createIndexes = async () => {
+    try {
+        // Create indexes without dropping existing ones
+        await StudentModel.collection.createIndexes([
             { key: { studentId: 1 }, unique: true },
             { key: { gmail: 1 }, unique: true }
         ]);
-    })
-    .then(() => {
-        console.log('Created new indexes for students collection');
-    })
-    .catch(error => {
-        console.error('Error managing indexes:', error);
-    });
+        console.log('Created/updated indexes for students collection');
+    } catch (error) {
+        console.error('Error creating indexes:', error);
+        // Don't throw the error, just log it
+    }
+};
+
+// Call createIndexes when the model is initialized
+createIndexes();
 
 export default StudentModel;

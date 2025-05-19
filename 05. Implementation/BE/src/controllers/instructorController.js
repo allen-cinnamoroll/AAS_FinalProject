@@ -195,9 +195,25 @@ const updateInstructor = async (req, res) => {
             existingPhoto: existingPhoto ? 'Existing photo data present' : 'No existing photo data'
         });
 
-        // Find instructor first
-        const instructor = await Instructor.findById(req.params.id);
+        let instructorId;
+        
+        // Check if this is a self-update from instructor or admin update
+        if (req.path === '/update-profile') {
+            // Self-update by instructor - use the ID from the authenticated user
+            instructorId = req.user.userId;
+            console.log('Self update - Instructor ID from token:', instructorId);
+        } else {
+            // Admin update - use the ID from the URL parameter
+            instructorId = req.params.id;
+            console.log('Admin update - Instructor ID from params:', instructorId);
+        }
+
+        // Find instructor
+        const instructor = await Instructor.findById(instructorId);
         if (!instructor) {
+            console.error('Instructor not found with ID:', instructorId);
+            console.log('User object from req.user:', req.user);
+            console.log('User data from req.userData:', req.userData);
             return res.status(404).json({
                 success: false,
                 message: "Instructor not found"
@@ -208,7 +224,7 @@ const updateInstructor = async (req, res) => {
 
         // Check if new gmail is already taken by another instructor
         if (gmail && gmail !== instructor.gmail) {
-            const gmailExists = await Instructor.findOne({ gmail });
+            const gmailExists = await Instructor.findOne({ gmail, _id: { $ne: instructorId } });
             if (gmailExists) {
                 return res.status(400).json({
                     success: false,
@@ -218,15 +234,16 @@ const updateInstructor = async (req, res) => {
         }
 
         // Prepare update data
-        const updateData = {
-            firstName,
-            lastName,
-            middleName,
-            suffix,
-            program,
-            faculty,
-            gmail: gmail.toLowerCase() // Ensure lowercase
-        };
+        const updateData = {};
+        
+        // Only update fields that are provided in the request
+        if (firstName) updateData.firstName = firstName;
+        if (lastName) updateData.lastName = lastName;
+        if (middleName !== undefined) updateData.middleName = middleName;
+        if (suffix !== undefined) updateData.suffix = suffix;
+        if (program) updateData.program = program;
+        if (faculty) updateData.faculty = faculty;
+        if (gmail) updateData.gmail = gmail.toLowerCase();
 
         // Handle photo update
         if (req.file) {
@@ -270,7 +287,7 @@ const updateInstructor = async (req, res) => {
 
         // Update instructor
         const updatedInstructor = await Instructor.findByIdAndUpdate(
-            req.params.id,
+            instructorId,
             updateData,
             {
                 new: true,

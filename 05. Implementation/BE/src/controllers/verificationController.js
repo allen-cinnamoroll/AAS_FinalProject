@@ -1,5 +1,6 @@
 import StudentModel from '../models/StudentModel.js';
 import InstructorModel from '../models/Instructor.js';
+import AdminModel from '../models/AdminModel.js';
 
 export const verifyEmail = async (req, res) => {
     try {
@@ -17,6 +18,8 @@ export const verifyEmail = async (req, res) => {
             user = await StudentModel.findOne({ verificationToken: token });
         } else if (type === 'instructor') {
             user = await InstructorModel.findOne({ verificationToken: token });
+        } else if (type === 'admin') {
+            user = await AdminModel.findOne({ verificationToken: token });
         } else {
             return res.status(400).json({
                 success: false,
@@ -32,7 +35,7 @@ export const verifyEmail = async (req, res) => {
         }
 
         // Update user verification status
-        user.isVerified = true;
+        user.isEmailVerified = true;
         user.verificationToken = undefined; // Remove the token after verification
         await user.save();
 

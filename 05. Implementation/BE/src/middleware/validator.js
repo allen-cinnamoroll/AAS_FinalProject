@@ -57,13 +57,21 @@ const uploadStudent = multer({
 // Validation middleware
 export const registrationValidationRules = () => {
   return [
-    body("firstName").trim().notEmpty().withMessage("First name is required"),
-    body("lastName").trim().notEmpty().withMessage("Last name is required"),
-    body("email").trim().isEmail().withMessage("Valid email is required"),
+    body("username")
+      .trim()
+      .notEmpty()
+      .withMessage("Username is required"),
+    body("gmail")
+      .trim()
+      .notEmpty()
+      .withMessage("Gmail address is required")
+      .isEmail()
+      .withMessage("Valid email is required")
+      .matches(/^[a-zA-Z0-9._%+-]+@gmail\.com$/)
+      .withMessage("Please provide a valid Gmail address"),
     body("password")
       .isLength({ min: 6 })
-      .withMessage("Password must be at least 6 characters long"),
-    body("role").isIn(["0", "1", "2"]).withMessage("Invalid role"),
+      .withMessage("Password must be at least 6 characters long")
   ];
 };
 
@@ -168,6 +176,12 @@ export const validate = (req, res, next) => {
 
 // Photo validation middleware
 export const photoValidation = (req, res, next) => {
+  // Skip validation if updating with keepExistingPhoto flag
+  if (req.method === 'PUT' && req.body.keepExistingPhoto === 'true') {
+    console.log('Skipping photo validation for update with keepExistingPhoto flag');
+    return next();
+  }
+
   if (!req.file) {
     return res.status(400).json({
       success: false,

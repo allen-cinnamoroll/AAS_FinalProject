@@ -39,6 +39,10 @@ const adminSchema = new mongoose.Schema(
           default: null
       }
     },
+    verificationToken: {
+      type: String,
+      default: null
+    },
     isEmailVerified: {
         type: Boolean,
         default: false

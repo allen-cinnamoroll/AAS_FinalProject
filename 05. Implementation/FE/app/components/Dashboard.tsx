@@ -18,6 +18,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import StudentManagement from './admin/StudentManagement';
 import InstructorManagement from './admin/InstructorManagement';
 import CourseManagement from './admin/CourseManagement';
+import { authService } from '../services/authService';
 
 interface DashboardProps {
   userData: any;
@@ -346,26 +347,23 @@ export default function Dashboard({ userData, onLogout }: DashboardProps) {
     }
   };
 
-  const handleLogout = () => {
-    if (Platform.OS === 'web') {
-      if (confirm('Are you sure you want to logout?')) {
-        onLogout();
-      }
-    } else {
-      Alert.alert(
-        'Logout',
-        'Are you sure you want to logout?',
-        [
-          {
-            text: 'Cancel',
-            style: 'cancel'
-          },
-          {
-            text: 'Yes',
-            onPress: onLogout
-          }
-        ]
-      );
+  const handleLogout = async () => {
+    try {
+      // Call the backend logout endpoint first
+      await authService.logout();
+      
+      // Then clear local storage
+      await AsyncStorage.removeItem('token');
+      await AsyncStorage.removeItem('userData');
+      
+      // Finally, call the parent's onLogout for UI updates
+      onLogout();
+    } catch (error) {
+      console.error('Error during logout:', error);
+      // Still clear local storage and update UI even if backend call fails
+      await AsyncStorage.removeItem('token');
+      await AsyncStorage.removeItem('userData');
+      onLogout();
     }
   };
 
@@ -385,18 +383,16 @@ export default function Dashboard({ userData, onLogout }: DashboardProps) {
       >
         <View className="flex-row items-center">
           <Text className="text-xl font-bold text-blue-700">ATS</Text>
-          {!isMobile && (
-            <Text className="text-base text-gray-700 ml-2">
-              | Admin Dashboard
-            </Text>
-          )}
+          <Text className="text-base text-gray-700 ml-2">
+            | Admin Dashboard
+          </Text>
         </View>
         <Pressable 
-          className="flex-row items-center space-x-2 px-3 py-1.5 rounded-full border border-gray-200"
+          className="flex-row items-center space-x-2 px-3 py-1.5 rounded-full bg-blue-50 border border-blue-200 hover:bg-blue-100 transition-colors"
           onPress={handleLogout}
         >
-          <Ionicons name="log-out-outline" size={16} color="#4B5563" />
-          <Text className="text-gray-700 text-sm">Logout</Text>
+          <Ionicons name="log-out-outline" size={16} color="#1D4ED8" />
+          <Text className="text-blue-700 font-medium text-sm ml-1">Logout</Text>
         </Pressable>
       </View>
 

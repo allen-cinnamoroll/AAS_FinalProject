@@ -49,14 +49,29 @@ export default function Register({ onClose }: { onClose: () => void }) {
       return;
     }
 
+    if (formData.password.length < 6) {
+      setMessage('Password must be at least 6 characters long');
+      return;
+    }
+
     try {
       setLoading(true);
+      setMessage(''); // Clear any previous messages
+      
       // Remove confirmPassword before sending to backend
       const { confirmPassword, ...registerData } = formData;
+      
+      console.log('Sending registration data:', {
+        username: registerData.username,
+        gmail: registerData.gmail,
+        password: '[REDACTED]'
+      });
+      
       const response = await authService.register(registerData);
       
+      console.log('Registration response:', response.data);
+      
       if (response.data.success) {
-        setMessage('');
         setRegistered(true);
         
         // Display success message
@@ -69,7 +84,12 @@ export default function Register({ onClose }: { onClose: () => void }) {
         throw new Error(response.data.message || 'Registration failed');
       }
     } catch (error: any) {
-      setMessage(error.response?.data?.message || 'Registration failed. Please try again.');
+      console.error('Registration error:', error);
+      setMessage(
+        error.response?.data?.message || 
+        error.message || 
+        'Registration failed. Please try again.'
+      );
     } finally {
       setLoading(false);
     }

@@ -1,7 +1,7 @@
 import axios from 'axios';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-// Replace with actual backend URL
+// Use the correct backend URL
 export const API_URL = "http://192.168.229.162:8000/api";
 
 const apiClient = axios.create({
@@ -9,6 +9,7 @@ const apiClient = axios.create({
   headers: {
     'Content-Type': 'application/json',
   },
+  timeout: 10000, // 10 second timeout
 });
 
 // Add request interceptor to include auth token
@@ -31,7 +32,7 @@ apiClient.interceptors.request.use(
   }
 );
 
-// Add response interceptor to handle token expiration
+// Add response interceptor to handle errors
 apiClient.interceptors.response.use(
   (response: any) => response,
   async (error: any) => {
@@ -40,6 +41,16 @@ apiClient.interceptors.response.use(
       await AsyncStorage.removeItem('token');
       // You might want to add navigation logic here
     }
+    
+    // Log the error for debugging
+    console.error('API Error:', {
+      url: error.config?.url,
+      method: error.config?.method,
+      status: error.response?.status,
+      message: error.message,
+      data: error.response?.data
+    });
+    
     return Promise.reject(error);
   }
 );

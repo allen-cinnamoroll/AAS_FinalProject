@@ -7,6 +7,15 @@ const courseSchema = new mongoose.Schema({
         trim: true,
         uppercase: true,
     },
+    courseCode: {
+        type: String,
+        trim: true,
+        uppercase: true
+    },
+    courseName: {
+        type: String,
+        trim: true
+    },
     description: {
         type: String,
         required: [true, "Course description is required"],
@@ -50,6 +59,45 @@ courseSchema.index({ courseId: 1 }, { unique: false });
 // Virtual for full course name
 courseSchema.virtual('fullCourseName').get(function() {
     return `${this.courseId} - ${this.description} (${this.courseType})`;
+});
+
+// Set courseCode and courseName on save if they're not already set
+courseSchema.pre('save', function(next) {
+    // If courseCode is not set, use courseId as default
+    if (!this.courseCode) {
+        this.courseCode = this.courseId;
+    }
+    
+    // If courseName is not set, use description as default
+    if (!this.courseName) {
+        this.courseName = this.description;
+    }
+    
+    next();
+});
+
+// Add a post-find hook to ensure courseCode and courseName are set
+courseSchema.post('find', function(docs) {
+    if (Array.isArray(docs)) {
+        docs.forEach(doc => {
+            if (!doc.courseCode) {
+                doc.courseCode = doc.courseId;
+            }
+            if (!doc.courseName) {
+                doc.courseName = doc.description;
+            }
+        });
+    }
+});
+
+// Also add a post-findOne hook
+courseSchema.post('findOne', function(doc) {
+    if (doc && !doc.courseCode) {
+        doc.courseCode = doc.courseId;
+    }
+    if (doc && !doc.courseName) {
+        doc.courseName = doc.description;
+    }
 });
 
 const CourseModel = mongoose.model("Course", courseSchema);

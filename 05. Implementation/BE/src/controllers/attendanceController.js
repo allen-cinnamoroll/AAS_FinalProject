@@ -128,12 +128,60 @@ const updateAttendancePercentage = async (studentId, sectionId) => {
     }
 };
 
+// Helper function to check if it's a new day for attendance
+const isNewDayForAttendance = async (sectionId) => {
+    try {
+        // Get the most recent attendance record for this section
+        const lastAttendance = await AttendanceModel.findOne({ section: sectionId })
+            .sort({ date: -1 })
+            .limit(1);
+
+        if (!lastAttendance) {
+            return true; // No previous attendance records, so it's a new day
+        }
+
+        const lastAttendanceDate = new Date(lastAttendance.date);
+        const currentDate = new Date();
+
+        // Check if the last attendance was on a different day
+        return (
+            lastAttendanceDate.getDate() !== currentDate.getDate() ||
+            lastAttendanceDate.getMonth() !== currentDate.getMonth() ||
+            lastAttendanceDate.getFullYear() !== currentDate.getFullYear()
+        );
+    } catch (error) {
+        console.error('Error checking for new day:', error);
+        return false;
+    }
+};
+
+// Helper function to reset attendance statuses for a section
+const resetAttendanceStatuses = async (sectionId) => {
+    try {
+        // Find all enrollments for this section
+        const enrollments = await EnrollmentModel.find({
+            $or: [
+                { section: sectionId },
+                { assignedCourse: sectionId }
+            ]
+        });
+
+        // Reset status for each enrollment
+        for (const enrollment of enrollments) {
+            enrollment.status = 'active';
+            await enrollment.save();
+        }
+
+        console.log(`Reset attendance statuses for section ${sectionId}`);
+    } catch (error) {
+        console.error('Error resetting attendance statuses:', error);
+    }
+};
+
 // Record attendance for a student
 export const recordAttendance = async (req, res) => {
     try {
         const { studentId, sectionId, date, enrollmentId } = req.body;
-        // Get instructor ID from the authenticated user
-        // The middleware sets user or userData depending on your auth implementation
         const instructorId = req.user?._id || req.userData?._id;
 
         console.log('Recording attendance:', { 
@@ -149,6 +197,13 @@ export const recordAttendance = async (req, res) => {
                 success: false,
                 message: "Instructor ID not found in request"
             });
+        }
+
+        // Check if it's a new day and reset statuses if needed
+        const isNewDay = await isNewDayForAttendance(sectionId);
+        if (isNewDay) {
+            await resetAttendanceStatuses(sectionId);
+            console.log('Reset attendance statuses for new day');
         }
 
         // Validate the student exists
@@ -319,31 +374,19 @@ export const recordAttendance = async (req, res) => {
 
         console.log('Creating attendance record with data:', attendanceData);
 
-        // Use findOneAndUpdate with upsert to handle duplicates gracefully
-        const result = await AttendanceModel.findOneAndUpdate(
-            { 
-                student: studentId, 
-                section: effectiveSectionId, 
-                date: {
-                    $gte: new Date(attendanceDate.setHours(0, 0, 0, 0)),
-                    $lt: new Date(attendanceDate.setHours(23, 59, 59, 999))
-                }
-            },
-            {
-                $set: {
-                    status: 'present',
-                    recordedBy: instructorId,
-                    enrollment: enrollment ? enrollment._id : undefined,
-                    updatedAt: new Date()
-                }
-            },
-            {
-                upsert: true,
-                new: true
-            }
-        );
+        // Create a new attendance record each time instead of updating an existing one
+        const newAttendanceRecord = new AttendanceModel({
+            student: studentId,
+            section: effectiveSectionId,
+            enrollment: enrollment ? enrollment._id : undefined,
+            date: attendanceDate,
+            status: 'present',
+            recordedBy: instructorId
+        });
+        
+        const result = await newAttendanceRecord.save();
 
-        console.log('Attendance record created/updated:', result);
+        console.log('New attendance record created:', result);
 
         // Update the class count on the section - only if it's a real section
         let updatedSection;
@@ -376,11 +419,12 @@ export const recordAttendance = async (req, res) => {
             .populate('student')
             .populate('recordedBy');
 
-        res.status(200).json({
+        res.status(201).json({
             success: true,
             message: "Attendance recorded successfully",
+            isNewDay,
             data: {
-                ...populatedRecord.toObject(),
+                attendance: populatedRecord,
                 attendancePercentage,
                 classesHeld: updatedSection.classesHeld,
                 courseInfo: courseInfo ? {
@@ -394,14 +438,6 @@ export const recordAttendance = async (req, res) => {
     } catch (error) {
         console.error('Error recording attendance:', error);
         
-        // Handle duplicate key error
-        if (error.code === 11000) {
-            return res.status(409).json({
-                success: false,
-                message: "Attendance already recorded for this student today"
-            });
-        }
-
         res.status(500).json({
             success: false,
             message: "Error recording attendance",
@@ -416,6 +452,17 @@ export const getAttendanceBySection = async (req, res) => {
         const { sectionId } = req.params;
         const date = req.query.date ? new Date(req.query.date) : new Date();
         
+        console.log(`Fetching attendance records for section ${sectionId} on date ${date.toISOString()}`);
+        
+        // Basic validation
+        if (!sectionId) {
+            console.error('Missing sectionId in request params');
+            return res.status(400).json({
+                success: false,
+                message: "Section ID is required"
+            });
+        }
+        
         // Find all attendance records for this section on the given date
         const records = await AttendanceModel.find({
             section: sectionId,
@@ -427,13 +474,15 @@ export const getAttendanceBySection = async (req, res) => {
         .populate('student')
         .populate('recordedBy');
         
+        console.log(`Found ${records.length} attendance records for section ${sectionId}`);
+        
         res.status(200).json({
             success: true,
             count: records.length,
             data: records
         });
     } catch (error) {
-        console.error('Error fetching attendance records:', error);
+        console.error(`Error fetching attendance records for section ${req.params.sectionId}:`, error);
         res.status(500).json({
             success: false,
             message: "Error fetching attendance records",
@@ -459,6 +508,7 @@ export const getStudentAttendance = async (req, res) => {
         const query = { student: studentId };
         if (sectionId) {
             query.section = sectionId;
+            console.log(`Filtering attendance by specific section: ${sectionId}`);
         }
         console.log('Attendance query:', query);
         
@@ -474,16 +524,50 @@ export const getStudentAttendance = async (req, res) => {
             
         console.log(`Found ${enrollments.length} enrollments for student`);
         
+        // Log more details about enrollments for debugging
+        enrollments.forEach((enrollment, index) => {
+            // Ensure courseCode and courseName exist
+            if (enrollment.assignedCourse && enrollment.assignedCourse.course) {
+                // If courseCode is missing, use courseId as fallback
+                if (!enrollment.assignedCourse.course.courseCode) {
+                    enrollment.assignedCourse.course.courseCode = enrollment.assignedCourse.course.courseId || 'ITC-Default';
+                }
+                // If courseName is missing, use description as fallback
+                if (!enrollment.assignedCourse.course.courseName) {
+                    enrollment.assignedCourse.course.courseName = enrollment.assignedCourse.course.description || 'Unknown Course';
+                }
+            }
+            
+            console.log(`Enrollment ${index + 1}:`, {
+                id: enrollment._id,
+                assignedCourseId: enrollment.assignedCourse?._id || 'missing',
+                courseCode: enrollment.assignedCourse?.course?.courseCode || 
+                            enrollment.assignedCourse?.course?.courseId || 'missing',
+                section: enrollment.assignedCourse?.section || 'missing'
+            });
+        });
+        
         // Create a map of courses by ID for quick lookup
         const courseMap = {};
         enrollments.forEach(enrollment => {
             if (enrollment.assignedCourse && enrollment.assignedCourse.course) {
                 const courseInfo = enrollment.assignedCourse.course;
+                
+                // Ensure courseCode exists
+                if (!courseInfo.courseCode) {
+                    courseInfo.courseCode = courseInfo.courseId || 'ITC-Default';
+                }
+                
+                // Ensure courseName exists
+                if (!courseInfo.courseName) {
+                    courseInfo.courseName = courseInfo.description || 'Unknown Course';
+                }
+                
                 courseMap[courseInfo._id.toString()] = {
                     ...courseInfo.toObject(),
                     section: enrollment.assignedCourse.section
                 };
-                console.log(`Mapped course ${courseInfo._id}: ${courseInfo.courseId || courseInfo.courseCode}`);
+                console.log(`Mapped course ${courseInfo._id}: ${courseInfo.courseCode || courseInfo.courseId}`);
             }
         });
         
@@ -530,7 +614,8 @@ export const getStudentAttendance = async (req, res) => {
                 hasSectionData: !!recordObj.section,
                 hasEnrollmentData: !!recordObj.enrollment,
                 sectionId: recordObj.section?._id || 'none',
-                enrollmentId: recordObj.enrollment?._id || 'none'
+                enrollmentId: recordObj.enrollment?._id || 'none',
+                sectionValue: recordObj.section?.section || 'none'
             });
             
             // Special handling for the ID mentioned in the user query
@@ -607,6 +692,7 @@ export const getStudentAttendance = async (req, res) => {
                             console.log(`Found course info in AssignedCourseModel: ${assignedCourse.course.courseId || assignedCourse.course.courseCode || assignedCourse.course._id}`);
                             recordObj.section.course = assignedCourse.course;
                             recordObj.section.section = assignedCourse.section;
+                            console.log(`Set section value to: ${assignedCourse.section}`);
                         } else {
                             console.log(`No course info found in AssignedCourseModel for section ${recordObj.section._id}`);
                         }
@@ -686,9 +772,17 @@ export const getStudentAttendance = async (req, res) => {
                     recordObj.section.course = {
                         _id: mongoose.Types.ObjectId(),
                         courseId: "Unknown",
-                        courseCode: "Unknown",
+                        courseCode: "ITC-Default",
                         courseName: "Unknown Course"
                     };
+                }
+            } else {
+                // Ensure courseCode and courseName exist in the course data
+                if (!recordObj.section.course.courseCode) {
+                    recordObj.section.course.courseCode = recordObj.section.course.courseId || "ITC-Default";
+                }
+                if (!recordObj.section.course.courseName) {
+                    recordObj.section.course.courseName = recordObj.section.course.description || "Unknown Course";
                 }
             }
             
@@ -786,30 +880,19 @@ export const markAbsent = async (req, res) => {
     // Parse the date or use current date
     const attendanceDate = date ? new Date(date) : new Date();
     
-    // Create or update the attendance record with 'absent' status
-    const result = await AttendanceModel.findOneAndUpdate(
-      { 
-        student: studentId, 
-        section: effectiveSectionId, 
-        date: {
-          $gte: new Date(new Date(attendanceDate).setHours(0, 0, 0, 0)),
-          $lt: new Date(new Date(attendanceDate).setHours(23, 59, 59, 999))
-        }
-      },
-      {
-        $set: {
-          status: 'absent',
-          recordedBy: instructorId,
-          enrollment: enrollment ? enrollment._id : undefined
-        }
-      },
-      {
-        new: true,
-        upsert: true
-      }
-    );
+    // Create a new attendance record with 'absent' status
+    const newAttendanceRecord = new AttendanceModel({
+      student: studentId,
+      section: effectiveSectionId,
+      enrollment: enrollment ? enrollment._id : undefined,
+      date: attendanceDate,
+      status: 'absent',
+      recordedBy: instructorId
+    });
     
-    console.log('Absence record created/updated:', result);
+    const result = await newAttendanceRecord.save();
+    
+    console.log('New absence record created:', result);
     
     // Increment the classesHeld count for the section if needed and if it's not temporary
     if (!section.isTemporary) {
@@ -929,33 +1012,22 @@ export const updateAttendanceStatus = async (req, res) => {
     // Parse the date or use current date
     const attendanceDate = date ? new Date(date) : new Date();
     
-    // Create or update the attendance record with the specified status
-    const result = await AttendanceModel.findOneAndUpdate(
-      { 
-        student: studentId, 
-        section: effectiveSectionId, 
-        date: {
-          $gte: new Date(new Date(attendanceDate).setHours(0, 0, 0, 0)),
-          $lt: new Date(new Date(attendanceDate).setHours(23, 59, 59, 999))
-        }
-      },
-      {
-        $set: {
-          status,
-          recordedBy: instructorId,
-          enrollment: enrollment ? enrollment._id : undefined
-        }
-      },
-      {
-        new: true,
-        upsert: true
-      }
-    );
+    // Create a new attendance record with the specified status
+    const newAttendanceRecord = new AttendanceModel({
+      student: studentId,
+      section: effectiveSectionId,
+      enrollment: enrollment ? enrollment._id : undefined,
+      date: attendanceDate,
+      status,
+      recordedBy: instructorId
+    });
     
-    console.log(`Attendance status updated to '${status}':`, result);
+    const result = await newAttendanceRecord.save();
+    
+    console.log(`New attendance record created with '${status}' status:`, result);
     
     // If this is a new record, increment the classesHeld count
-    if (result && result.isNew && !section.isTemporary) {
+    if (!section.isTemporary) {
       await SectionModel.findByIdAndUpdate(
         section._id,
         { $inc: { classesHeld: 1 } }
@@ -982,6 +1054,54 @@ export const updateAttendanceStatus = async (req, res) => {
     res.status(500).json({
       success: false,
       message: "Error updating attendance status",
+      error: error.message
+    });
+  }
+};
+
+// Delete a single attendance record (student can delete their own records)
+export const deleteAttendance = async (req, res) => {
+  try {
+    const { attendanceId } = req.params;
+    const studentId = req.user._id; // Get current student's ID
+    
+    console.log(`Student ${studentId} attempting to delete attendance record ${attendanceId}`);
+    
+    // Check if the attendance record exists
+    const attendanceRecord = await AttendanceModel.findById(attendanceId);
+    
+    if (!attendanceRecord) {
+      console.log(`Attendance record ${attendanceId} not found`);
+      return res.status(404).json({
+        success: false,
+        message: "Attendance record not found"
+      });
+    }
+    
+    // Verify the record belongs to the requesting student
+    if (attendanceRecord.student.toString() !== studentId.toString()) {
+      console.log(`Unauthorized: Record belongs to ${attendanceRecord.student}, not ${studentId}`);
+      return res.status(403).json({
+        success: false,
+        message: "You can only delete your own attendance records"
+      });
+    }
+    
+    // Delete the record
+    await AttendanceModel.findByIdAndDelete(attendanceId);
+    
+    console.log(`Successfully deleted attendance record ${attendanceId}`);
+    
+    res.status(200).json({
+      success: true,
+      message: "Attendance record deleted successfully"
+    });
+    
+  } catch (error) {
+    console.error('Error deleting attendance record:', error);
+    res.status(500).json({
+      success: false,
+      message: "Error deleting attendance record",
       error: error.message
     });
   }

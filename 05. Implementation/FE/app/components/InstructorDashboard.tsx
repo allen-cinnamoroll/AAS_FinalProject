@@ -19,6 +19,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CameraView, useCameraPermissions } from 'expo-camera';
+import { authService } from '../services/authService';
 
 // Constant for web platform detection
 const isWeb = Platform.OS === 'web';
@@ -46,37 +47,86 @@ const QRScannerComponent = ({
   
   console.log('QRScannerComponent rendering with hasPermission:', hasPermission, 'isWeb:', isWeb);
   
-  // On web, provide a manual entry fallback
+  // On web, provide both camera and manual entry options
   if (isWeb) {
-    console.log('Using web fallback for QR scanner');
+    console.log('Using web QR scanner with camera support');
     return (
-      <View style={styles.qrScannerWebFallback}>
-        <Text style={styles.qrScannerTitle}>Enter Student QR Code Data</Text>
-        <Text style={styles.qrScannerWebInstructions}>
-          For web platforms, please enter the QR code data manually:
-        </Text>
-        
-        <TextInput
-          style={styles.qrScannerTextInput}
-          value={manualInput}
-          onChangeText={setManualInput}
-          placeholder='Enter QR code data (e.g. {"studentId":"123","sectionId":"456"})'
-          multiline
-        />
-        
-        <Pressable 
-          style={styles.qrRescanButton}
-          onPress={() => {
-            if (manualInput.trim()) {
-              console.log('Manual QR code data submitted:', manualInput);
-              onScan(manualInput);
-            } else {
-              Alert.alert('Error', 'Please enter valid QR code data');
-            }
-          }}
-        >
-          <Text style={styles.qrRescanButtonText}>Submit</Text>
-        </Pressable>
+      <View style={styles.qrScannerWebContainer}>
+        {hasPermission === null ? (
+          <View style={styles.qrScannerMessage}>
+            <Text>Requesting camera permission...</Text>
+          </View>
+        ) : hasPermission === false ? (
+          <View style={styles.qrScannerWebFallback}>
+            <Text style={styles.qrScannerTitle}>Camera Access Denied</Text>
+            <Text style={styles.qrScannerWebInstructions}>
+              Please allow camera access or use manual entry:
+            </Text>
+            
+            <TextInput
+              style={styles.qrScannerTextInput}
+              value={manualInput}
+              onChangeText={setManualInput}
+              placeholder='Enter QR code data (e.g. {"studentId":"123","sectionId":"456"})'
+              multiline
+            />
+            
+            <Pressable 
+              style={styles.qrRescanButton}
+              onPress={() => {
+                if (manualInput.trim()) {
+                  console.log('Manual QR code data submitted:', manualInput);
+                  onScan(manualInput);
+                  setManualInput(''); // Clear input after submission
+                } else {
+                  Alert.alert('Error', 'Please enter valid QR code data');
+                }
+              }}
+            >
+              <Text style={styles.qrRescanButtonText}>Submit</Text>
+            </Pressable>
+          </View>
+        ) : (
+          <View style={styles.qrScannerWebWrapper}>
+            <View style={styles.qrScannerWebCameraContainer}>
+              <CameraView
+                style={styles.qrScannerCamera}
+                facing="back"
+                onBarcodeScanned={scanned ? undefined : (result) => {
+                  console.log('Barcode detected by CameraView:', result);
+                  if (result && result.data) {
+                    setScanned(true); // Set scanned to true before processing
+                    onScan(result.data);
+                  }
+                }}
+                barcodeScannerSettings={{
+                  barcodeTypes: ['qr']
+                }}
+                onCameraReady={() => {
+                  console.log('Camera is ready');
+                  setScanned(false); // Reset scanned state when camera is ready
+                }}
+                onMountError={(error) => console.error('Camera mount error:', error)}
+              >
+                <View style={styles.qrScannerOverlay}>
+                  <View style={styles.qrScannerTargetBox}>
+                    <View style={styles.qrCornerTL} />
+                    <View style={styles.qrCornerTR} />
+                    <View style={styles.qrCornerBL} />
+                    <View style={styles.qrCornerBR} />
+                  </View>
+                  
+                  <View style={styles.qrScannerHintContainer}>
+                    <Ionicons name="qr-code" size={24} color="#FFFFFF" style={styles.qrScannerHintIcon} />
+                    <Text style={styles.qrScannerHint}>
+                      Position the QR code within the frame
+                    </Text>
+                  </View>
+                </View>
+              </CameraView>
+            </View>
+          </View>
+        )}
       </View>
     );
   }
@@ -117,12 +167,18 @@ const QRScannerComponent = ({
         facing="back"
         onBarcodeScanned={scanned ? undefined : (result) => {
           console.log('Barcode detected by CameraView:', result);
-          onScan(result.data);
+          if (result && result.data) {
+            setScanned(true); // Set scanned to true before processing
+            onScan(result.data);
+          }
         }}
         barcodeScannerSettings={{
           barcodeTypes: ['qr']
         }}
-        onCameraReady={() => console.log('Camera is ready')}
+        onCameraReady={() => {
+          console.log('Camera is ready');
+          setScanned(false); // Reset scanned state when camera is ready
+        }}
         onMountError={(error) => console.error('Camera mount error:', error)}
       >
         <View style={styles.qrScannerOverlay}>
@@ -140,20 +196,6 @@ const QRScannerComponent = ({
             </Text>
           </View>
         </View>
-        
-        {scanned && (
-          <View style={styles.qrRescanButtonContainer}>
-            <Pressable 
-              style={styles.qrRescanButton}
-              onPress={() => {
-                console.log('Resetting scan state to scan again');
-                setScanned(false);
-              }}
-            >
-              <Text style={styles.qrRescanButtonText}>Tap to Scan Again</Text>
-            </Pressable>
-          </View>
-        )}
       </CameraView>
     </View>
   );
@@ -336,8 +378,11 @@ export default function InstructorDashboard({ userData, onLogout }: InstructorDa
       });
 
       console.log('Attendance response status:', response.status);
+      
       if (!response.ok) {
-        throw new Error('Failed to fetch attendance records');
+        const errorData = await response.json().catch(() => ({}));
+        console.error('Error fetching attendance:', errorData);
+        throw new Error(errorData.message || 'Failed to fetch attendance records');
       }
       
       const data = await response.json();
@@ -345,7 +390,7 @@ export default function InstructorDashboard({ userData, onLogout }: InstructorDa
       
       if (data.success && data.data) {
         // Update the attendance statuses based on today's records
-        const newStatuses = { ...attendanceStatuses };
+        const newStatuses: Record<string, string> = {};
         
         data.data.forEach((record: any) => {
           if (record.student && record.student._id) {
@@ -597,26 +642,23 @@ export default function InstructorDashboard({ userData, onLogout }: InstructorDa
     return `${days.join(', ')} ${startTime} - ${endTime}`;
   };
 
-  const handleLogout = () => {
-    if (Platform.OS === 'web') {
-      if (confirm('Are you sure you want to logout?')) {
-        onLogout();
-      }
-    } else {
-      Alert.alert(
-        'Logout',
-        'Are you sure you want to logout?',
-        [
-          {
-            text: 'Cancel',
-            style: 'cancel'
-          },
-          {
-            text: 'Yes',
-            onPress: onLogout
-          }
-        ]
-      );
+  const handleLogout = async () => {
+    try {
+      // Call the backend logout endpoint first
+      await authService.logout();
+      
+      // Then clear local storage
+      await AsyncStorage.removeItem('token');
+      await AsyncStorage.removeItem('userData');
+      
+      // Finally, call the parent's onLogout for UI updates
+      onLogout();
+    } catch (error) {
+      console.error('Error during logout:', error);
+      // Still clear local storage and update UI even if backend call fails
+      await AsyncStorage.removeItem('token');
+      await AsyncStorage.removeItem('userData');
+      onLogout();
     }
   };
 
@@ -639,6 +681,8 @@ export default function InstructorDashboard({ userData, onLogout }: InstructorDa
     console.log('Selected section with enrolledStudents:', section.enrolledStudents);
     setSelectedSection(section);
     setViewMode('students');
+    // Clear attendance statuses when selecting a new section
+    setAttendanceStatuses({});
     fetchStudentsForSection(section._id);
   };
 
@@ -657,25 +701,12 @@ export default function InstructorDashboard({ userData, onLogout }: InstructorDa
   // Modified recordAttendance function with enhanced debug logging
   const recordAttendance = async (studentId: string, sectionId: string, enrollmentId?: string) => {
     try {
-      console.log('Starting attendance recording process...');
+      console.log('Recording attendance for:', { studentId, sectionId, enrollmentId });
+      
+      // Get the token from AsyncStorage
       const token = await AsyncStorage.getItem('token');
       if (!token) {
-        console.error('No authentication token found');
         throw new Error('No authentication token found');
-      }
-      
-      console.log('Using token:', token);
-      
-      // Try to decode the token to verify it contains the instructor ID
-      try {
-        // Simple decode - just to check structure, not for verification
-        const parts = token.split('.');
-        if (parts.length === 3) {
-          const payload = JSON.parse(atob(parts[1]));
-          console.log('Token payload:', payload);
-        }
-      } catch (err) {
-        console.log('Could not decode token for debugging:', err);
       }
 
       // Find the student in the current section to get the correct ID format
@@ -686,28 +717,12 @@ export default function InstructorDashboard({ userData, onLogout }: InstructorDa
         s.studentId?.toString() === studentId?.toString()
       );
       
-      if (!student) {
-        console.log('Note: Student not found in the current student list:', studentId);
-        console.log('Will attempt to use the provided ID directly');
-      } else {
-        console.log('Found student in current list:', student._id, student.fullName);
-      }
-      
       // Use the matching student ID if found, otherwise use the original
       const effectiveStudentId = student ? (student._id || student.studentId) : studentId;
       console.log('Using student ID for attendance:', effectiveStudentId);
 
-      // Debug section data
-      console.log('Selected section:', selectedSection);
-      if (selectedCourse) {
-        console.log('Current course:', {
-          _id: selectedCourse._id,
-          courseId: selectedCourse.courseId
-        });
-      }
-
-      // Get the section ID - this could be from various places
-      const effectiveSectionId = sectionId || selectedSection?._id || selectedSection?.course;
+      // Use the effective section ID
+      const effectiveSectionId = selectedSection?._id || sectionId;
       console.log('Using sectionId for attendance:', effectiveSectionId);
 
       const baseUrl = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.229.162:8000';
@@ -741,6 +756,12 @@ export default function InstructorDashboard({ userData, onLogout }: InstructorDa
       }
       
       console.log('Attendance recorded successfully');
+      
+      // If the response indicates a new day, reset all statuses
+      if (data.isNewDay) {
+        setAttendanceStatuses({});
+        console.log('Reset all attendance statuses for new day');
+      }
       
       // Update the attendance status to "present" in the UI
       if (student) {
@@ -783,6 +804,7 @@ export default function InstructorDashboard({ userData, onLogout }: InstructorDa
   
   // Handle QR code scan
   const handleBarCodeScanned = (data: string) => {
+    // Set scanned to true to prevent multiple scans of the same code
     setScanned(true);
     console.log('QR Code scanned! Raw data:', data);
     console.log('Current attendance statuses before scan:', attendanceStatuses);
@@ -855,6 +877,7 @@ export default function InstructorDashboard({ userData, onLogout }: InstructorDa
                   });
                   setShowSuccessModal(true);
                   setShowQRScanner(false);
+                  setScanned(false); // Reset scanned state
                 } else {
                   console.log('QR Success: Student not found in local list for status update');
                   // Try to get student info from QR data if available
@@ -869,6 +892,7 @@ export default function InstructorDashboard({ userData, onLogout }: InstructorDa
                   setSuccessStudent(studentInfo);
                   setShowSuccessModal(true);
                   setShowQRScanner(false);
+                  setScanned(false); // Reset scanned state
                   
                   // Refresh the student list to include this student
                   fetchStudentsForSection(selectedSection._id);
@@ -882,7 +906,10 @@ export default function InstructorDashboard({ userData, onLogout }: InstructorDa
                   [
                     { 
                       text: "Try Again", 
-                      onPress: () => setScanned(false) 
+                      onPress: () => {
+                        setScanned(false);
+                        setShowQRScanner(true);
+                      }
                     },
                     { 
                       text: "Cancel", 
@@ -904,7 +931,10 @@ export default function InstructorDashboard({ userData, onLogout }: InstructorDa
               [
                 { 
                   text: "Try Again", 
-                  onPress: () => setScanned(false) 
+                  onPress: () => {
+                    setScanned(false);
+                    setShowQRScanner(true);
+                  }
                 },
                 { 
                   text: "Cancel", 
@@ -973,6 +1003,7 @@ export default function InstructorDashboard({ userData, onLogout }: InstructorDa
                     });
                     setShowSuccessModal(true);
                     setShowQRScanner(false);
+                    setScanned(false); // Reset scanned state
                   } else {
                     console.log('QR Success: Student not found in local list for status update');
                     
@@ -988,6 +1019,7 @@ export default function InstructorDashboard({ userData, onLogout }: InstructorDa
                     setSuccessStudent(studentInfo);
                     setShowSuccessModal(true);
                     setShowQRScanner(false);
+                    setScanned(false); // Reset scanned state
                     
                     // Refresh the student list to include this student
                     fetchStudentsForSection(selectedSection._id);
@@ -1001,7 +1033,10 @@ export default function InstructorDashboard({ userData, onLogout }: InstructorDa
                     [
                       { 
                         text: "Try Again", 
-                        onPress: () => setScanned(false) 
+                        onPress: () => {
+                          setScanned(false);
+                          setShowQRScanner(true);
+                        }
                       },
                       { 
                         text: "Cancel", 
@@ -1024,7 +1059,10 @@ export default function InstructorDashboard({ userData, onLogout }: InstructorDa
                 [
                   { 
                     text: "Try Again", 
-                    onPress: () => setScanned(false) 
+                    onPress: () => {
+                      setScanned(false);
+                      setShowQRScanner(true);
+                    }
                   },
                   { 
                     text: "Cancel", 
@@ -1044,7 +1082,10 @@ export default function InstructorDashboard({ userData, onLogout }: InstructorDa
               [
                 { 
                   text: "Try Again", 
-                  onPress: () => setScanned(false) 
+                  onPress: () => {
+                    setScanned(false);
+                    setShowQRScanner(true);
+                  }
                 },
                 { 
                   text: "Cancel", 
@@ -1065,7 +1106,10 @@ export default function InstructorDashboard({ userData, onLogout }: InstructorDa
           [
             { 
               text: "Try Again", 
-              onPress: () => setScanned(false) 
+              onPress: () => {
+                setScanned(false);
+                setShowQRScanner(true);
+              }
             },
             { 
               text: "Cancel", 
@@ -1085,7 +1129,10 @@ export default function InstructorDashboard({ userData, onLogout }: InstructorDa
         [
           { 
             text: "Try Again", 
-            onPress: () => setScanned(false) 
+            onPress: () => {
+              setScanned(false);
+              setShowQRScanner(true);
+            }
           },
           { 
             text: "Cancel", 
@@ -1548,32 +1595,48 @@ export default function InstructorDashboard({ userData, onLogout }: InstructorDa
       
       console.log('Updating profile with data:', editableProfile);
       
+      // Make sure token format is correct
+      const authToken = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
+      
       const response = await fetch(url, {
         method: 'PUT',
         headers: {
-          'Authorization': token,
+          'Authorization': authToken,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(editableProfile),
       });
 
-      const data = await response.json();
-      
       if (!response.ok) {
-        throw new Error(data.message || 'Failed to update profile');
+        const data = await response.json();
+        throw new Error(data.message || `Failed to update profile: ${response.status} ${response.statusText}`);
       }
 
+      const data = await response.json();
+      
       // Update the local instructor data with the updated values
       setInstructorData({
         ...instructorData,
         ...editableProfile,
       });
 
-      Alert.alert('Success', 'Profile updated successfully');
+      // Show different alerts based on platform
+      if (Platform.OS === 'web') {
+        alert('Profile updated successfully');
+      } else {
+        Alert.alert('Success', 'Profile updated successfully');
+      }
+      
       setIsEditingProfile(false);
     } catch (error) {
       console.error('Error updating profile:', error);
-      Alert.alert('Error', error instanceof Error ? error.message : 'Failed to update profile');
+      
+      // Show different alerts based on platform
+      if (Platform.OS === 'web') {
+        alert(error instanceof Error ? error.message : 'Failed to update profile');
+      } else {
+        Alert.alert('Error', error instanceof Error ? error.message : 'Failed to update profile');
+      }
     }
   };
 
@@ -1801,23 +1864,12 @@ export default function InstructorDashboard({ userData, onLogout }: InstructorDa
       return;
     }
 
-    // Use a ref to track if we already ran this effect for this specific students array
-    // to prevent multiple consecutive calls to fetchTodayAttendance
     const runOnce = () => {
       console.log('Student list changed, checking status indicators...');
       
-      // Check if any students are missing status indicators
-      const studentsWithoutStatus = students.filter(
-        student => !attendanceStatuses[student._id]
-      );
-      
-      if (studentsWithoutStatus.length > 0) {
-        console.log(`Found ${studentsWithoutStatus.length} students without status indicators, updating from backend...`);
-        // Fetch today's attendance to update status indicators for these students
-        fetchTodayAttendance(selectedSection._id);
-      } else {
-        console.log('All students have status indicators');
-      }
+      // Fetch attendance data whenever section or students change
+      console.log('Fetching attendance data for section:', selectedSection._id);
+      fetchTodayAttendance(selectedSection._id);
     };
 
     // Only run once when the students array changes
@@ -1826,9 +1878,20 @@ export default function InstructorDashboard({ userData, onLogout }: InstructorDa
     // Clean up timeout to prevent memory leaks
     return () => clearTimeout(timeoutId);
     
-    // IMPORTANT: Remove attendanceStatuses from the dependency array to prevent infinite loop
-    // since fetchTodayAttendance updates attendanceStatuses which would trigger this effect again
   }, [students, selectedSection?._id, viewMode]);
+
+  // Add this useEffect to handle success modal
+  useEffect(() => {
+    if (showSuccessModal) {
+      // Automatically close the success modal after 3 seconds
+      const timer = setTimeout(() => {
+        setShowSuccessModal(false);
+        setSuccessStudent(null);
+      }, 3000);
+
+      return () => clearTimeout(timer);
+    }
+  }, [showSuccessModal]);
 
   return (
     <SafeAreaView style={styles.container}>
@@ -1867,7 +1930,10 @@ export default function InstructorDashboard({ userData, onLogout }: InstructorDa
         visible={showSuccessModal}
         transparent={true}
         animationType="fade"
-        onRequestClose={() => setShowSuccessModal(false)}
+        onRequestClose={() => {
+          setShowSuccessModal(false);
+          setSuccessStudent(null);
+        }}
       >
         <View style={styles.modalOverlay}>
           <View style={styles.successModalContent}>
@@ -1911,12 +1977,12 @@ export default function InstructorDashboard({ userData, onLogout }: InstructorDa
                 {new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
               </Text>
             </View>
-            
+
             <Pressable 
               style={styles.successButton}
               onPress={() => {
                 setShowSuccessModal(false);
-                setScanned(false);
+                setSuccessStudent(null);
               }}
             >
               <Text style={styles.successButtonText}>Done</Text>
@@ -1976,18 +2042,16 @@ export default function InstructorDashboard({ userData, onLogout }: InstructorDa
       >
         <View className="flex-row items-center">
           <Text className="text-xl font-bold text-blue-700">ATS</Text>
-          {!isMobile && (
-            <Text className="text-base text-gray-700 ml-2">
-              | Instructor Dashboard
-            </Text>
-          )}
+          <Text className="text-base text-gray-700 ml-2">
+            | Instructor Dashboard
+          </Text>
         </View>
         <Pressable 
-          className="flex-row items-center space-x-2 px-3 py-1.5 rounded-full border border-gray-200"
+          className="flex-row items-center space-x-2 px-3 py-1.5 rounded-full bg-blue-50 border border-blue-200 hover:bg-blue-100 transition-colors"
           onPress={handleLogout}
         >
-          <Ionicons name="log-out-outline" size={16} color="#4B5563" />
-          <Text className="text-gray-700 text-sm">Logout</Text>
+          <Ionicons name="log-out-outline" size={16} color="#1D4ED8" />
+          <Text className="text-blue-700 font-medium text-sm ml-1">Logout</Text>
         </Pressable>
       </View>
       
@@ -2573,16 +2637,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   qrScannerTargetBox: {
-    width: 200,
-    height: 200,
+    width: 500,
+    height: 500,
     borderWidth: 2,
     borderColor: 'white',
     borderRadius: 16,
     position: 'relative',
   },
   qrCornerTL: {
-    width: 20,
-    height: 20,
+    width: 30,
+    height: 30,
     borderLeftWidth: 4,
     borderTopWidth: 4,
     borderColor: '#FFFFFF',
@@ -2591,8 +2655,8 @@ const styles = StyleSheet.create({
     left: -2,
   },
   qrCornerTR: {
-    width: 20,
-    height: 20,
+    width: 30,
+    height: 30,
     borderRightWidth: 4,
     borderTopWidth: 4,
     borderColor: '#FFFFFF',
@@ -2601,8 +2665,8 @@ const styles = StyleSheet.create({
     right: -2,
   },
   qrCornerBL: {
-    width: 20,
-    height: 20,
+    width: 30,
+    height: 30,
     borderLeftWidth: 4,
     borderBottomWidth: 4,
     borderColor: '#FFFFFF',
@@ -2611,8 +2675,8 @@ const styles = StyleSheet.create({
     left: -2,
   },
   qrCornerBR: {
-    width: 20,
-    height: 20,
+    width: 30,
+    height: 30,
     borderRightWidth: 4,
     borderBottomWidth: 4,
     borderColor: '#FFFFFF',
@@ -2943,5 +3007,33 @@ const styles = StyleSheet.create({
     color: '#FFFFFF',
     fontSize: 16,
     fontWeight: '600',
+  },
+  
+  // New styles for web QR scanner
+  qrScannerWebContainer: {
+    flex: 1,
+    backgroundColor: 'white',
+  },
+  qrScannerWebWrapper: {
+    flex: 1,
+    padding: 16,
+  },
+  qrScannerWebCameraContainer: {
+    flex: 1,
+    position: 'relative',
+    borderRadius: 12,
+    overflow: 'hidden',
+    minHeight: 400,
+  },
+  qrScannerCamera: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+  },
+  qrScannerWebManualEntry: {
+    width: 300,
+    padding: 16,
+    backgroundColor: '#F3F4F6',
+    borderRadius: 12,
   },
 }); 

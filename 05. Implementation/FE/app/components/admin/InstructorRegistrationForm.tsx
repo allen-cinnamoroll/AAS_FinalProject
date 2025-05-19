@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ScrollView, Image, Platform } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, ScrollView, Image, Platform, StyleSheet } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import * as ImagePicker from 'expo-image-picker';
+import { Ionicons } from '@expo/vector-icons';
 import apiClient from '../../services/api';
 import { InstructorFormData } from '../../types/forms';
 import { getImageUrl } from '../../utils/imageUtils';
@@ -15,7 +16,7 @@ interface InstructorRegistrationFormProps {
     lastName: string;
     middleName?: string;
     suffix?: string;
-    instructorId: string;
+    instructorId: string;       
     program: string;
     faculty: string;
     gmail: string;
@@ -30,6 +31,89 @@ interface InstructorRegistrationFormProps {
     };
   } | null;
 }
+
+const styles = StyleSheet.create({
+  formIconContainer: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: '#EFF6FF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12
+  },
+  photoContainer: {
+    width: 130,
+    height: 130,
+    borderRadius: 65,
+    backgroundColor: '#F3F4F6',
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  photo: {
+    width: '100%',
+    height: '100%'
+  },
+  photoPlaceholder: {
+    alignItems: 'center',
+    justifyContent: 'center'
+  },
+  uploadButton: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    backgroundColor: '#2563EB',
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16
+  },
+  errorContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FEE2E2',
+    padding: 12,
+    borderRadius: 8,
+    marginTop: 8
+  },
+  submitButton: {
+    backgroundColor: '#2563EB',
+    padding: 16,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 8
+  },
+  submitButtonDisabled: {
+    backgroundColor: '#93C5FD'
+  },
+  submitButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600'
+  },
+  loadingIndicator: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+    borderTopColor: 'transparent',
+    marginRight: 8
+  }
+});
 
 export default function InstructorRegistrationForm({ onSuccess, editingInstructor }: InstructorRegistrationFormProps) {
   const [formData, setFormData] = useState<InstructorFormData>({
@@ -253,42 +337,58 @@ export default function InstructorRegistrationForm({ onSuccess, editingInstructo
     <>
       <ScrollView className="flex-1 bg-gray-50" contentContainerStyle={{ paddingBottom: 100 }}>
         <View className="p-4 space-y-6">
-          {/* Profile Photo Upload */}
+          {/* Form title card with icon */}
+          <View className="bg-white p-5 rounded-lg shadow-sm flex-row items-center">
+            <View style={styles.formIconContainer}>
+              <Ionicons 
+                name={editingInstructor ? "create-outline" : "person-add-outline"} 
+                size={28} 
+                color="#2563EB" 
+              />
+            </View>
+            <View style={{flex: 1}}>
+              <Text className="text-xl font-bold text-gray-800">
+                {editingInstructor ? 'Edit Instructor Profile' : 'New Instructor Registration'}
+              </Text>
+              <Text className="text-gray-600 text-sm mt-1">
+                Please fill in all required fields marked with *
+              </Text>
+            </View>
+          </View>
+
+          {/* Profile Photo Upload - Enhanced UI */}
           <View className="items-center">
             <View className="relative">
-              <View className="w-32 h-32 rounded-full bg-gray-200 items-center justify-center overflow-hidden">
+              <View style={styles.photoContainer}>
                 {formData.idPhoto ? (
                   <Image
                     source={{ uri: formData.idPhoto.uri }}
-                    className="w-full h-full"
+                    style={styles.photo}
                   />
                 ) : (
-                  <Text className="text-gray-500">No Photo</Text>
+                  <View style={styles.photoPlaceholder}>
+                    <Ionicons name="person" size={50} color="#9CA3AF" />
+                    <Text className="text-gray-500 mt-2">ID Photo</Text>
+                  </View>
                 )}
               </View>
               <TouchableOpacity
                 onPress={pickImage}
-                className="absolute bottom-0 right-0 bg-blue-600 p-2 rounded-full"
+                style={styles.uploadButton}
               >
-                <Text className="text-white text-xs">Upload</Text>
+                <Ionicons name="camera" size={22} color="#FFFFFF" />
               </TouchableOpacity>
             </View>
-            <Text className="text-gray-600 mt-2 text-sm">Upload ID Photo</Text>
-          </View>
-
-          {/* Form Title */}
-          <View className="bg-white p-4 rounded-lg shadow-sm">
-            <Text className="text-xl font-bold text-gray-800 mb-2">
-              {editingInstructor ? 'Edit Instructor' : 'Register New Instructor'}
-            </Text>
-            <Text className="text-gray-600 text-sm">
-              Please fill in all required fields marked with *
-            </Text>
+            <Text className="text-gray-600 mt-2 text-sm">Upload Instructor ID Photo *</Text>
           </View>
 
           {/* Personal Information Section */}
           <View className="bg-white p-4 rounded-lg shadow-sm space-y-4">
-            <Text className="text-lg font-semibold text-gray-800 mb-2">Personal Information</Text>
+            {/* Section header with icon */}
+            <View style={styles.sectionHeader}>
+              <Ionicons name="person-outline" size={22} color="#2563EB" />
+              <Text className="text-lg font-semibold text-gray-800 ml-2">Personal Information</Text>
+            </View>
             
             {/* First Name */}
             <View>
@@ -346,8 +446,12 @@ export default function InstructorRegistrationForm({ onSuccess, editingInstructo
 
           {/* Academic Information Section */}
           <View className="bg-white p-4 rounded-lg shadow-sm space-y-4">
-            <Text className="text-lg font-semibold text-gray-800 mb-2">Academic Information</Text>
-
+            {/* Section header with icon */}
+            <View style={styles.sectionHeader}>
+              <Ionicons name="school-outline" size={22} color="#7C3AED" />
+              <Text className="text-lg font-semibold text-gray-800 ml-2">Academic Information</Text>
+            </View>
+            
             {/* Program */}
             <View>
               <Text className="text-gray-700 mb-1">Program *</Text>
@@ -373,8 +477,12 @@ export default function InstructorRegistrationForm({ onSuccess, editingInstructo
 
           {/* Contact Information Section */}
           <View className="bg-white p-4 rounded-lg shadow-sm space-y-4">
-            <Text className="text-lg font-semibold text-gray-800 mb-2">Contact Information</Text>
-
+            {/* Section header with icon */}
+            <View style={styles.sectionHeader}>
+              <Ionicons name="mail-outline" size={22} color="#EC4899" />
+              <Text className="text-lg font-semibold text-gray-800 ml-2">Contact Information</Text>
+            </View>
+            
             {/* Instructor ID */}
             <View>
               <Text className="text-gray-700 mb-1">Instructor ID *</Text>
@@ -400,22 +508,41 @@ export default function InstructorRegistrationForm({ onSuccess, editingInstructo
             </View>
           </View>
 
-          {/* Error Message */}
+          {/* Error Message - Enhanced UI */}
           {error ? (
-            <View className="bg-red-50 p-3 rounded-lg">
-              <Text className="text-red-600 text-center">{error}</Text>
+            <View style={styles.errorContainer}>
+              <Ionicons name="alert-circle" size={24} color="#DC2626" style={{marginRight: 8}} />
+              <Text className="text-red-600 flex-1">{error}</Text>
             </View>
           ) : null}
 
-          {/* Submit Button */}
+          {/* Submit Button - Enhanced UI */}
           <TouchableOpacity
             onPress={handleSubmit}
             disabled={loading}
-            className={`p-4 rounded-lg ${loading ? 'bg-blue-400' : 'bg-blue-600'}`}
+            style={[
+              styles.submitButton,
+              loading ? styles.submitButtonDisabled : {}
+            ]}
           >
-            <Text className="text-white text-center font-semibold">
-              {loading ? 'Processing...' : editingInstructor ? 'Update Instructor' : 'Register Instructor'}
-            </Text>
+            {loading ? (
+              <View style={{flexDirection: 'row', alignItems: 'center', justifyContent: 'center'}}>
+                <View style={styles.loadingIndicator} />
+                <Text style={styles.submitButtonText}>Processing...</Text>
+              </View>
+            ) : (
+              <View style={{flexDirection: 'row', alignItems: 'center', justifyContent: 'center'}}>
+                <Ionicons 
+                  name={editingInstructor ? "save-outline" : "add-circle-outline"} 
+                  size={22} 
+                  color="#FFFFFF" 
+                  style={{marginRight: 8}} 
+                />
+                <Text style={styles.submitButtonText}>
+                  {editingInstructor ? 'Update Instructor' : 'Register Instructor'}
+                </Text>
+              </View>
+            )}
           </TouchableOpacity>
         </View>
       </ScrollView>

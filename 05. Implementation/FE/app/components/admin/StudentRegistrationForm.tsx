@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TextInput, TouchableOpacity, ScrollView, Image, Platform, Alert } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, ScrollView, Image, Platform, Alert, Modal, StyleSheet } from 'react-native';
 import { Picker } from '@react-native-picker/picker';
 import * as ImagePicker from 'expo-image-picker';
+import { Ionicons } from '@expo/vector-icons';
 import apiClient from '../../services/api';
 import { StudentFormData } from '../../types/forms';
 import { getImageUrl } from '../../utils/imageUtils';
@@ -48,6 +49,8 @@ export default function StudentRegistrationForm({ onSuccess, editingStudent }: S
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [registered, setRegistered] = useState(false);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [registeredStudentData, setRegisteredStudentData] = useState<any>(null);
 
   useEffect(() => {
     if (editingStudent) {
@@ -127,7 +130,7 @@ export default function StudentRegistrationForm({ onSuccess, editingStudent }: S
         return;
       }
 
-      // Only require photo for new registrations
+      // Only require photo for new registrations, not for updates
       if (!editingStudent && !formData.idPhoto) {
         setError('ID photo is required for new registrations');
         setLoading(false);
@@ -168,13 +171,23 @@ export default function StudentRegistrationForm({ onSuccess, editingStudent }: S
         formDataToSend.append('suffix', formData.suffix);
       }
 
-      // Add photo if it exists
+      // Add photo if it exists and has changed
       if (formData.idPhoto) {
-        formDataToSend.append('idPhoto', {
-          uri: formData.idPhoto.uri,
-          type: 'image/jpeg',
-          name: 'photo.jpg'
-        } as any);
+        // For update operations where the photo hasn't changed, don't re-upload
+        const isNewPhoto = !editingStudent?.idPhoto || 
+                         (formData.idPhoto.uri !== getImageUrl(editingStudent.idPhoto.url));
+        
+        if (!editingStudent || isNewPhoto) {
+          // Only attach photo if it's new or this is a new student
+          formDataToSend.append('idPhoto', {
+            uri: formData.idPhoto.uri,
+            type: 'image/jpeg',
+            name: 'photo.jpg'
+          } as any);
+        } else {
+          // For web platform, add a flag to indicate we're keeping the existing photo
+          formDataToSend.append('keepExistingPhoto', 'true');
+        }
       }
 
       let response;
@@ -187,14 +200,11 @@ export default function StudentRegistrationForm({ onSuccess, editingStudent }: S
         });
         
         if (response.data.success) {
-          if (Platform.OS === 'web') {
-            alert('Student updated successfully!');
-          } else {
-            Alert.alert('Success', 'Student updated successfully!');
-          }
-          if (onSuccess) {
-            onSuccess();
-          }
+          setRegisteredStudentData({
+            ...response.data.data,
+            isUpdate: true
+          });
+          setShowSuccessModal(true);
         } else {
           setError(response.data.message || 'Failed to update student');
         }
@@ -208,14 +218,11 @@ export default function StudentRegistrationForm({ onSuccess, editingStudent }: S
         
         if (response.data.success) {
           setRegistered(true);
-          if (Platform.OS === 'web') {
-            alert('Student registered successfully!');
-          } else {
-            Alert.alert('Success', 'Student registered successfully!');
-          }
-          if (onSuccess) {
-            onSuccess();
-          }
+          setRegisteredStudentData({
+            ...response.data.data,
+            isUpdate: false
+          });
+          setShowSuccessModal(true);
         } else {
           setError(response.data.message || 'Failed to register student');
         }
@@ -228,7 +235,49 @@ export default function StudentRegistrationForm({ onSuccess, editingStudent }: S
     }
   };
 
-  if (registered) {
+  const closeSuccessModal = () => {
+    setShowSuccessModal(false);
+    if (onSuccess) {
+      onSuccess();
+    }
+  };
+
+  // Success modal to show after successful registration/update
+  const SuccessModal = () => (
+    <Modal
+      visible={showSuccessModal}
+      transparent={true}
+      animationType="fade"
+      onRequestClose={closeSuccessModal}
+    >
+      <View style={styles.modalOverlay}>
+        <View style={styles.successModalContent}>
+          <View style={styles.successIconContainer}>
+            <Ionicons name="checkmark-circle" size={70} color="#059669" />
+          </View>
+          
+          <Text style={styles.successTitle}>
+            {registeredStudentData?.isUpdate ? 'Student Updated!' : 'Registration Successful!'}
+          </Text>
+          
+          <Text style={styles.successMessage}>
+            {registeredStudentData?.isUpdate 
+              ? 'The student information has been successfully updated in the system.' 
+              : 'The student has been successfully registered and can now be enrolled in courses.'}
+          </Text>
+          
+          <TouchableOpacity
+            style={styles.closeButton}
+            onPress={closeSuccessModal}
+          >
+            <Text style={styles.closeButtonText}>Continue</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+
+  if (registered && !showSuccessModal) {
     return (
       <View className="flex-1 bg-gray-50 items-center justify-center p-4">
         <View className="bg-white p-6 rounded-lg shadow-sm items-center">
@@ -254,43 +303,62 @@ export default function StudentRegistrationForm({ onSuccess, editingStudent }: S
 
   return (
     <ScrollView className="flex-1 bg-gray-50" contentContainerStyle={{ paddingBottom: 100 }}>
+      {/* Success Modal */}
+      <SuccessModal />
+      
       <View className="p-4 space-y-6">
-        {/* Profile Photo Upload */}
+        {/* Form title card with icon */}
+        <View className="bg-white p-5 rounded-lg shadow-sm flex-row items-center">
+          <View style={styles.formIconContainer}>
+            <Ionicons 
+              name={editingStudent ? "create-outline" : "person-add-outline"} 
+              size={28} 
+              color="#2563EB" 
+            />
+          </View>
+          <View style={{flex: 1}}>
+            <Text className="text-xl font-bold text-gray-800">
+              {editingStudent ? 'Edit Student Profile' : 'New Student Registration'}
+            </Text>
+            <Text className="text-gray-600 text-sm mt-1">
+              Please fill in all required fields marked with *
+            </Text>
+          </View>
+        </View>
+
+        {/* Profile Photo Upload - Enhanced UI */}
         <View className="items-center">
           <View className="relative">
-            <View className="w-32 h-32 rounded-full bg-gray-200 items-center justify-center overflow-hidden">
+            <View style={styles.photoContainer}>
               {formData.idPhoto ? (
                 <Image
                   source={{ uri: formData.idPhoto.uri }}
-                  className="w-full h-full"
+                  style={styles.photo}
                 />
               ) : (
-                <Text className="text-gray-500">No Photo</Text>
+                <View style={styles.photoPlaceholder}>
+                  <Ionicons name="person" size={50} color="#9CA3AF" />
+                  <Text className="text-gray-500 mt-2">ID Photo</Text>
+                </View>
               )}
             </View>
             <TouchableOpacity
               onPress={pickImage}
-              className="absolute bottom-0 right-0 bg-blue-600 p-2 rounded-full"
+              style={styles.uploadButton}
             >
-              <Text className="text-white text-xs">Upload</Text>
+              <Ionicons name="camera" size={22} color="#FFFFFF" />
             </TouchableOpacity>
           </View>
-          <Text className="text-gray-600 mt-2 text-sm">Upload ID Photo</Text>
-        </View>
-
-        {/* Form Title */}
-        <View className="bg-white p-4 rounded-lg shadow-sm">
-          <Text className="text-xl font-bold text-gray-800 mb-2">
-            {editingStudent ? 'Edit Student' : 'Register New Student'}
-          </Text>
-          <Text className="text-gray-600 text-sm">
-            Please fill in all required fields marked with *
-          </Text>
+          <Text className="text-gray-600 mt-2 text-sm">Upload Student ID Photo *</Text>
         </View>
 
         {/* Personal Information Section */}
         <View className="bg-white p-4 rounded-lg shadow-sm space-y-4">
-          <Text className="text-lg font-semibold text-gray-800 mb-2">Personal Information</Text>
+          {/* Section header with icon */}
+          <View style={styles.sectionHeader}>
+            <Ionicons name="person-outline" size={22} color="#2563EB" />
+            <Text className="text-lg font-semibold text-gray-800 ml-2">Personal Information</Text>
+          </View>
           
           {/* First Name */}
           <View>
@@ -348,8 +416,12 @@ export default function StudentRegistrationForm({ onSuccess, editingStudent }: S
 
         {/* Academic Information Section */}
         <View className="bg-white p-4 rounded-lg shadow-sm space-y-4">
-          <Text className="text-lg font-semibold text-gray-800 mb-2">Academic Information</Text>
-
+          {/* Section header with icon */}
+          <View style={styles.sectionHeader}>
+            <Ionicons name="school-outline" size={22} color="#7C3AED" />
+            <Text className="text-lg font-semibold text-gray-800 ml-2">Academic Information</Text>
+          </View>
+          
           {/* Year Level */}
           <View>
             <Text className="text-gray-700 mb-1">Year Level *</Text>
@@ -392,8 +464,12 @@ export default function StudentRegistrationForm({ onSuccess, editingStudent }: S
 
         {/* Contact Information Section */}
         <View className="bg-white p-4 rounded-lg shadow-sm space-y-4">
-          <Text className="text-lg font-semibold text-gray-800 mb-2">Contact Information</Text>
-
+          {/* Section header with icon */}
+          <View style={styles.sectionHeader}>
+            <Ionicons name="mail-outline" size={22} color="#EC4899" />
+            <Text className="text-lg font-semibold text-gray-800 ml-2">Contact Information</Text>
+          </View>
+          
           {/* Student ID */}
           <View>
             <Text className="text-gray-700 mb-1">Student ID *</Text>
@@ -419,24 +495,198 @@ export default function StudentRegistrationForm({ onSuccess, editingStudent }: S
           </View>
         </View>
 
-        {/* Error Message */}
+        {/* Error Message - Enhanced UI */}
         {error ? (
-          <View className="bg-red-50 p-3 rounded-lg">
-            <Text className="text-red-600 text-center">{error}</Text>
+          <View style={styles.errorContainer}>
+            <Ionicons name="alert-circle" size={24} color="#DC2626" style={{marginRight: 8}} />
+            <Text className="text-red-600 flex-1">{error}</Text>
           </View>
         ) : null}
 
-        {/* Submit Button */}
+        {/* Submit Button - Enhanced UI */}
         <TouchableOpacity
           onPress={handleSubmit}
           disabled={loading}
-          className={`p-4 rounded-lg ${loading ? 'bg-blue-400' : 'bg-blue-600'}`}
+          style={[
+            styles.submitButton,
+            loading ? styles.submitButtonDisabled : {}
+          ]}
         >
-          <Text className="text-white text-center font-semibold">
-            {loading ? 'Processing...' : editingStudent ? 'Update Student' : 'Register Student'}
-          </Text>
+          {loading ? (
+            <View style={{flexDirection: 'row', alignItems: 'center', justifyContent: 'center'}}>
+              <View style={styles.loadingIndicator} />
+              <Text style={styles.submitButtonText}>Processing...</Text>
+            </View>
+          ) : (
+            <View style={{flexDirection: 'row', alignItems: 'center', justifyContent: 'center'}}>
+              <Ionicons 
+                name={editingStudent ? "save-outline" : "add-circle-outline"} 
+                size={22} 
+                color="#FFFFFF" 
+                style={{marginRight: 8}} 
+              />
+              <Text style={styles.submitButtonText}>
+                {editingStudent ? 'Update Student' : 'Register Student'}
+              </Text>
+            </View>
+          )}
         </TouchableOpacity>
       </View>
     </ScrollView>
   );
-} 
+}
+
+const styles = StyleSheet.create({
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  successModalContent: {
+    backgroundColor: 'white',
+    borderRadius: 20,
+    width: '90%',
+    maxWidth: 400,
+    paddingVertical: 30,
+    paddingHorizontal: 20,
+    alignItems: 'center',
+    elevation: 5,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+  },
+  successIconContainer: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    backgroundColor: 'rgba(5, 150, 105, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 20,
+  },
+  successTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#059669',
+    marginBottom: 20,
+    textAlign: 'center',
+  },
+  successMessage: {
+    fontSize: 16,
+    color: '#4B5563',
+    textAlign: 'center',
+    marginBottom: 20,
+    lineHeight: 22,
+  },
+  closeButton: {
+    backgroundColor: '#059669',
+    paddingVertical: 12,
+    paddingHorizontal: 30,
+    borderRadius: 10,
+    width: '80%',
+  },
+  closeButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: 'bold',
+    textAlign: 'center',
+  },
+  
+  // Enhanced form UI styles
+  formIconContainer: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    backgroundColor: 'rgba(37, 99, 235, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  photoContainer: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    backgroundColor: '#F3F4F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+    borderWidth: 3,
+    borderColor: '#E5E7EB',
+    borderStyle: 'dashed',
+  },
+  photo: {
+    width: '100%',
+    height: '100%',
+  },
+  photoPlaceholder: {
+    alignItems: 'center',
+  },
+  uploadButton: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    backgroundColor: '#2563EB',
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 3,
+    borderColor: 'white',
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 10,
+    paddingBottom: 10,
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+  },
+  errorContainer: {
+    backgroundColor: '#FEF2F2',
+    padding: 12,
+    borderRadius: 8,
+    borderLeftWidth: 4,
+    borderLeftColor: '#DC2626',
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  submitButton: {
+    backgroundColor: '#2563EB',
+    padding: 15,
+    borderRadius: 10,
+    shadowColor: '#2563EB',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  submitButtonDisabled: {
+    backgroundColor: '#93C5FD',
+  },
+  submitButtonText: {
+    color: 'white',
+    textAlign: 'center',
+    fontWeight: 'bold',
+    fontSize: 16,
+  },
+  loadingIndicator: {
+    width: 20,
+    height: 20,
+    borderRadius: 10,
+    borderWidth: 2,
+    borderColor: 'white',
+    borderTopColor: 'transparent',
+    marginRight: 10,
+    transform: [{ rotate: '45deg' }],
+  },
+}); 

@@ -38,6 +38,7 @@ export default function LandingPage() {
   const [userData, setUserData] = useState<any>(null);
   const [isWelcomeModalVisible, setWelcomeModalVisible] = useState(false);
   const [shouldShowDashboard, setShouldShowDashboard] = useState(false);
+  const [showLogoutModal, setShowLogoutModal] = useState(false);
   
   // Check if user is already logged in - run on initial load and when auth modal closes
   const checkLoginStatus = async () => {
@@ -81,42 +82,27 @@ export default function LandingPage() {
   };
   
   const handleLogout = async () => {
-    // Show confirmation dialog
-    const performLogout = async () => {
-      try {
-        // Remove items from AsyncStorage
-        await AsyncStorage.removeItem('userData');
-        await AsyncStorage.removeItem('token');
-        
-        // Update local state after successful logout
-        setIsLoggedIn(false);
-        setUserData(null);
-        setShouldShowDashboard(false);
-      } catch (error) {
-        console.error("Error during logout:", error);
-      }
-    };
-
-    if (Platform.OS === 'web') {
-      if (confirm('Are you sure you want to logout?')) {
-        await performLogout();
-      }
-    } else {
-      Alert.alert(
-        'Logout',
-        'Are you sure you want to logout?',
-        [
-          {
-            text: 'Cancel',
-            style: 'cancel'
-          },
-          {
-            text: 'Yes',
-            onPress: performLogout
-          }
-        ]
-      );
+    setShowLogoutModal(true);
+  };
+  
+  const confirmLogout = async () => {
+    try {
+      // Remove items from AsyncStorage
+      await AsyncStorage.removeItem('userData');
+      await AsyncStorage.removeItem('token');
+      
+      // Update local state after successful logout
+      setIsLoggedIn(false);
+      setUserData(null);
+      setShouldShowDashboard(false);
+      setShowLogoutModal(false);
+    } catch (error) {
+      console.error("Error during logout:", error);
     }
+  };
+
+  const cancelLogout = () => {
+    setShowLogoutModal(false);
   };
   
   // Add welcome modal handler for auth success
@@ -144,17 +130,70 @@ export default function LandingPage() {
     }, 3000);
   };
   
+  // Render logout confirmation modal
+  const renderLogoutModal = () => {
+    return (
+      <Modal
+        visible={showLogoutModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={cancelLogout}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.logoutModalContent}>
+            <View style={styles.logoutIconContainer}>
+              <Ionicons name="log-out-outline" size={32} color="#EF4444" />
+            </View>
+            <Text style={styles.logoutModalTitle}>Confirm Logout</Text>
+            <Text style={styles.logoutModalMessage}>
+              Are you sure you want to log out of your account?
+            </Text>
+            <View style={styles.logoutButtonContainer}>
+              <Pressable 
+                style={styles.cancelButton}
+                onPress={cancelLogout}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </Pressable>
+              <Pressable 
+                style={styles.logoutButton}
+                onPress={confirmLogout}
+              >
+                <Text style={styles.logoutButtonText}>Logout</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    );
+  };
+  
   // Render appropriate dashboard based on user type
   if (shouldShowDashboard && userData) {
     console.log("LandingPage: Rendering dashboard with user data:", JSON.stringify(userData, null, 2));
     
     switch (userData.userType) {
       case 'student':
-        return <StudentDashboard userData={userData} onLogout={handleLogout} />;
+        return (
+          <>
+            <StudentDashboard userData={userData} onLogout={handleLogout} />
+            {renderLogoutModal()}
+          </>
+        );
       case 'instructor':
-        return <InstructorDashboard userData={userData} onLogout={handleLogout} />;
+        return (
+          <>
+            <InstructorDashboard userData={userData} onLogout={handleLogout} />
+            {renderLogoutModal()}
+          </>
+        );
       case 'admin':
-        return <Dashboard userData={userData} onLogout={handleLogout} />;
+        return (
+          <>
+            <Dashboard userData={userData} onLogout={handleLogout} />
+            {renderLogoutModal()}
+          </>
+        );
       default:
         console.error("Unknown user type:", userData.userType);
         return null;
@@ -189,6 +228,7 @@ export default function LandingPage() {
 
   return (
     <View style={styles.container}>
+      {renderLogoutModal()}
       <ScrollView className="flex-1 bg-white">
         <StatusBar style="dark" />
         
@@ -410,5 +450,79 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: '#fff',
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  logoutModalContent: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    padding: 24,
+    width: '85%',
+    maxWidth: 400,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  logoutIconContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#FEE2E2',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  logoutModalTitle: {
+    fontSize: 20,
+    fontWeight: 'bold',
+    color: '#1F2937',
+    marginBottom: 12,
+  },
+  logoutModalMessage: {
+    fontSize: 16,
+    color: '#4B5563',
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  logoutButtonContainer: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    width: '100%',
+  },
+  cancelButton: {
+    flex: 1,
+    backgroundColor: '#F3F4F6',
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginRight: 8,
+    alignItems: 'center',
+  },
+  cancelButtonText: {
+    color: '#4B5563',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  logoutButton: {
+    flex: 1,
+    backgroundColor: '#EF4444',
+    paddingVertical: 12,
+    borderRadius: 8,
+    marginLeft: 8,
+    alignItems: 'center',
+  },
+  logoutButtonText: {
+    color: 'white',
+    fontSize: 16,
+    fontWeight: '600',
   },
 });

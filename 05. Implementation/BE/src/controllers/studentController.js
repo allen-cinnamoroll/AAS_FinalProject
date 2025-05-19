@@ -1,6 +1,7 @@
 import StudentModel from '../models/StudentModel.js';
 import { generateOTP, sendOTP } from '../utils/emailUtil.js';
 import EnrollmentModel from '../models/EnrollmentModel.js';
+import AttendanceModel from '../models/AttendanceModel.js';
 
 const registerStudent = async (req, res) => {
     try {
@@ -192,7 +193,8 @@ const updateStudent = async (req, res) => {
             program,
             faculty,
             gmail,
-            existingPhoto
+            existingPhoto,
+            keepExistingPhoto
         } = req.body;
 
         console.log('Received update request:', {
@@ -210,12 +212,29 @@ const updateStudent = async (req, res) => {
                 mimetype: req.file.mimetype,
                 size: req.file.size
             } : 'No file',
-            existingPhoto: existingPhoto ? 'Existing photo data present' : 'No existing photo data'
+            existingPhoto: existingPhoto ? 'Existing photo data present' : 'No existing photo data',
+            keepExistingPhoto: keepExistingPhoto || 'Not provided'
         });
 
-        // Find student first
-        const student = await StudentModel.findById(req.params.id);
+        let studentIdValue;
+        
+        // Check if this is a self-update from student or admin update
+        if (req.path === '/update-profile') {
+            // Self-update by student - use the ID from the authenticated user
+            studentIdValue = req.user.userId;
+            console.log('Self update - Student ID from token:', studentIdValue);
+        } else {
+            // Admin update - use the ID from the URL parameter
+            studentIdValue = req.params.id;
+            console.log('Admin update - Student ID from params:', studentIdValue);
+        }
+
+        // Find student
+        const student = await StudentModel.findById(studentIdValue);
         if (!student) {
+            console.error('Student not found with ID:', studentIdValue);
+            console.log('User object from req.user:', req.user);
+            console.log('User data from req.userData:', req.userData);
             return res.status(404).json({
                 success: false,
                 message: "Student not found"
@@ -226,7 +245,7 @@ const updateStudent = async (req, res) => {
 
         // Check if new gmail is already taken by another student
         if (gmail && gmail !== student.gmail) {
-            const gmailExists = await StudentModel.findOne({ gmail });
+            const gmailExists = await StudentModel.findOne({ gmail, _id: { $ne: studentIdValue } });
             if (gmailExists) {
                 return res.status(400).json({
                     success: false,
@@ -236,16 +255,17 @@ const updateStudent = async (req, res) => {
         }
 
         // Prepare update data
-        const updateData = {
-            firstName,
-            lastName,
-            middleName,
-            suffix,
-            studentId,
-            program,
-            faculty,
-            gmail: gmail.toLowerCase() // Ensure lowercase
-        };
+        const updateData = {};
+        
+        // Only update fields that are provided in the request
+        if (firstName) updateData.firstName = firstName;
+        if (lastName) updateData.lastName = lastName;
+        if (middleName !== undefined) updateData.middleName = middleName;
+        if (suffix !== undefined) updateData.suffix = suffix;
+        if (studentId) updateData.studentId = studentId;
+        if (program) updateData.program = program;
+        if (faculty) updateData.faculty = faculty;
+        if (gmail) updateData.gmail = gmail.toLowerCase();
 
         // Handle photo update
         if (req.file) {
@@ -261,6 +281,14 @@ const updateStudent = async (req, res) => {
                 }
             };
             console.log('New photo uploaded:', updateData.idPhoto);
+        } else if (keepExistingPhoto === 'true') {
+            // Explicitly keep existing photo (for web updates)
+            if (student.idPhoto) {
+                updateData.idPhoto = student.idPhoto;
+                console.log('Keeping existing photo from keepExistingPhoto flag:', updateData.idPhoto);
+            } else {
+                console.log('No existing photo to keep despite keepExistingPhoto flag');
+            }
         } else if (existingPhoto) {
             // Keep existing photo
             try {
@@ -268,27 +296,28 @@ const updateStudent = async (req, res) => {
                 // Ensure the URL is properly formatted
                 const photoPath = parsedPhoto.url.replace(/\\/g, '/');
                 updateData.idPhoto = {
-                    ...parsedPhoto,
-                    url: photoPath
+                    url: photoPath,
+                    publicId: parsedPhoto.publicId,
+                    metadata: parsedPhoto.metadata
                 };
-                console.log('Keeping existing photo:', updateData.idPhoto);
+                console.log('Keeping existing photo from parsed existingPhoto:', updateData.idPhoto);
             } catch (error) {
                 console.error('Error parsing existing photo data:', error);
                 // If parsing fails, keep the current photo from the database
                 updateData.idPhoto = student.idPhoto;
-                console.log('Using current photo from database:', updateData.idPhoto);
+                console.log('Using current photo from database due to parsing error:', updateData.idPhoto);
             }
-        } else {
-            // No photo data provided, keep the current photo
+        } else if (student.idPhoto) {
+            // No new photo provided, but we have an existing one in the database
             updateData.idPhoto = student.idPhoto;
-            console.log('No photo data provided, keeping current photo:', updateData.idPhoto);
+            console.log('No explicit photo data provided, keeping current photo from database:', updateData.idPhoto);
         }
 
         console.log('Updating student with data:', updateData);
 
         // Update student
         const updatedStudent = await StudentModel.findByIdAndUpdate(
-            req.params.id,
+            studentIdValue,
             updateData,
             {
                 new: true,
@@ -306,19 +335,18 @@ const updateStudent = async (req, res) => {
 
     } catch (error) {
         console.error('Error updating student:', error);
-        console.error('Error stack:', error.stack);
         res.status(500).json({
             success: false,
             message: "Error updating student",
-            error: error.message,
-            stack: process.env.NODE_ENV === 'development' ? error.stack : undefined
+            error: error.message
         });
     }
 };
 
 const deleteStudent = async (req, res) => {
     try {
-        const student = await StudentModel.findById(req.params.id);
+        const studentId = req.params.id;
+        const student = await StudentModel.findById(studentId);
         
         if (!student) {
             return res.status(404).json({
@@ -327,14 +355,31 @@ const deleteStudent = async (req, res) => {
             });
         }
 
-        await StudentModel.findByIdAndDelete(req.params.id);
+        // Find all enrollments for this student
+        const enrollments = await EnrollmentModel.find({ student: studentId });
+        
+        // Delete all related attendance records
+        await AttendanceModel.deleteMany({ student: studentId });
+        console.log(`Deleted attendance records for student ${studentId}`);
+        
+        // Delete all enrollments for this student
+        await EnrollmentModel.deleteMany({ student: studentId });
+        console.log(`Deleted ${enrollments.length} enrollments for student ${studentId}`);
+        
+        // Delete the student record
+        await StudentModel.findByIdAndDelete(studentId);
+        console.log(`Deleted student ${studentId}`);
 
         res.status(200).json({
             success: true,
-            message: "Student deleted successfully"
+            message: "Student and all related records deleted successfully",
+            data: {
+                enrollmentsRemoved: enrollments.length
+            }
         });
 
     } catch (error) {
+        console.error("Error deleting student:", error);
         res.status(500).json({
             success: false,
             message: "Error deleting student",

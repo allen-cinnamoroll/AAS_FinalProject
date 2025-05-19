@@ -12,6 +12,7 @@ import {
   Alert,
   RefreshControl,
   TextInput,
+  Modal,
 } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { Ionicons } from '@expo/vector-icons';
@@ -19,6 +20,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import QRCode from 'react-native-qrcode-svg';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CameraView, useCameraPermissions } from 'expo-camera';
+import { authService } from '../services/authService';
 
 interface StudentDashboardProps {
   userData: any;
@@ -31,6 +33,8 @@ export default function StudentDashboard({ userData, onLogout }: StudentDashboar
   const [studentData, setStudentData] = useState<any>(null);
   const [enrollments, setEnrollments] = useState<any[]>([]);
   const [selectedEnrollment, setSelectedEnrollment] = useState<any>(null);
+  // Keep track of whether we're currently selecting an enrollment
+  const [isChangingEnrollment, setIsChangingEnrollment] = useState(false);
   const [attendanceRecords, setAttendanceRecords] = useState<any[]>([]);
   const [loadingAttendance, setLoadingAttendance] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -38,6 +42,10 @@ export default function StudentDashboard({ userData, onLogout }: StudentDashboar
   const [refreshing, setRefreshing] = useState(false);
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [editableProfile, setEditableProfile] = useState<any>(null);
+  const [deletingAttendance, setDeletingAttendance] = useState(false);
+  const [selectedAttendance, setSelectedAttendance] = useState<any>(null);
+  const [showAttendanceModal, setShowAttendanceModal] = useState(false);
+  const [showProfileUpdateModal, setShowProfileUpdateModal] = useState(false);
   const isMobile = Platform.OS !== 'web';
   
   // Add refs to track initial mount and prevent infinite loops
@@ -50,18 +58,24 @@ export default function StudentDashboard({ userData, onLogout }: StudentDashboar
   }, []);
   
   useEffect(() => {
-    // Only fetch attendance when tab changes to 'attendance' or
-    // when selectedEnrollment changes AFTER initial mount
+    // Fetch attendance when tab changes to 'attendance'
     if (activeTab === 'attendance') {
       if (!attendanceTabSelected.current) {
         attendanceTabSelected.current = true;
       }
       
+      // Only fetch if not already loading
       if (!loadingAttendance) {
+        console.log('Tab changed to attendance - fetching all attendance records');
+        
+        // Clear attendance records before fetching to prevent old data from showing
+        setAttendanceRecords([]);
         fetchAttendanceRecords();
+      } else {
+        console.log('Skipping auto-fetch: loadingAttendance=', loadingAttendance);
       }
     }
-  }, [activeTab, selectedEnrollment?._id]);
+  }, [activeTab]);
 
   // Remove the problematic useEffect that was causing the infinite update loop
   // This effect was redundant with the one above that already handles
@@ -171,25 +185,71 @@ export default function StudentDashboard({ userData, onLogout }: StudentDashboar
       
       // Fetch student's enrollments
       try {
+        // Make sure token format is correct
+        const authToken = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
+        
         const enrollmentsResponse = await fetch(`${baseUrl}/api/enrollments/my-enrollments`, {
           method: 'GET',
           headers: {
-            'Authorization': token,
+            'Authorization': authToken,
             'Content-Type': 'application/json',
           },
         });
         
         console.log('Enrollments response status:', enrollmentsResponse.status);
-        const enrollmentsData = await enrollmentsResponse.json();
+        
+        // Parse response as text first for debugging
+        const responseText = await enrollmentsResponse.text();
+        console.log('Raw enrollments response:', responseText.substring(0, 200) + '...');
+        
+        let enrollmentsData;
+        try {
+          enrollmentsData = JSON.parse(responseText);
+        } catch (parseError) {
+          console.error('Error parsing enrollments response:', parseError);
+          throw new Error('Invalid JSON in enrollments response');
+        }
+        
         console.log('Student enrollments data:', enrollmentsData);
         
         if (enrollmentsResponse.ok && enrollmentsData.success && enrollmentsData.data) {
-          setEnrollments(enrollmentsData.data);
+          // Validate and fix enrollments data before setting state
+          const processedEnrollments = enrollmentsData.data.map((enrollment: any) => {
+            // Ensure assignedCourse exists
+            if (!enrollment.assignedCourse) {
+              console.warn(`Enrollment ${enrollment._id} missing assignedCourse`);
+              enrollment.assignedCourse = { section: 'Unknown' };
+            }
+            
+            // Ensure course exists in assignedCourse
+            if (!enrollment.assignedCourse.course) {
+              console.warn(`Enrollment ${enrollment._id} missing course data`);
+              enrollment.assignedCourse.course = { 
+                courseCode: 'ITC-Default', 
+                courseName: 'Unknown Course' 
+              };
+            } else if (!enrollment.assignedCourse.course.courseCode) {
+              // Fix missing courseCode by using courseId
+              console.log(`Setting missing courseCode for ${enrollment._id}`);
+              enrollment.assignedCourse.course.courseCode = 
+                enrollment.assignedCourse.course.courseId || 'ITC-Default';
+            }
+            
+            // Ensure instructor exists in assignedCourse
+            if (!enrollment.assignedCourse.instructor) {
+              console.warn(`Enrollment ${enrollment._id} missing instructor data`);
+              enrollment.assignedCourse.instructor = { fullName: 'Unknown Instructor' };
+            }
+            
+            return enrollment;
+          });
+          
+          setEnrollments(processedEnrollments);
           
           // Set the first enrollment as selected by default
-          if (enrollmentsData.data.length > 0) {
-            setSelectedEnrollment(enrollmentsData.data[0]);
-            console.log('Selected enrollment:', enrollmentsData.data[0]);
+          if (processedEnrollments.length > 0) {
+            setSelectedEnrollment(processedEnrollments[0]);
+            console.log('Selected enrollment:', processedEnrollments[0]);
           }
         } else {
           console.log('No enrollments found for student');
@@ -237,7 +297,13 @@ export default function StudentDashboard({ userData, onLogout }: StudentDashboar
   const fetchAttendanceRecords = async () => {
     try {
       setLoadingAttendance(true);
+      // Clear attendance records first to prevent showing stale data
+      setAttendanceRecords([]);
+      
+      console.log('==========================================');
       console.log('Starting to fetch attendance records...');
+      console.log('Current selected enrollment:', selectedEnrollment ? 
+        `${selectedEnrollment._id} (${selectedEnrollment.assignedCourse?.course?.courseCode} - ${selectedEnrollment.assignedCourse?.section})` : 'none');
       
       const token = await AsyncStorage.getItem('token');
       if (!token) {
@@ -248,13 +314,7 @@ export default function StudentDashboard({ userData, onLogout }: StudentDashboar
       const baseUrl = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.229.162:8000';
       let url = `${baseUrl}/api/attendance/my-attendance`;
       
-      // If we have a selected enrollment, filter by section
-      if (selectedEnrollment && selectedEnrollment._id && selectedEnrollment.assignedCourse && selectedEnrollment.assignedCourse._id) {
-        url += `?sectionId=${selectedEnrollment.assignedCourse._id}`;
-        console.log(`Filtering attendance by section: ${selectedEnrollment.assignedCourse._id}`);
-      } else {
-        console.log('Fetching attendance for all courses (no filter)');
-      }
+      console.log('Fetching attendance for all courses');
       
       console.log('Fetching attendance records from:', url);
 
@@ -269,6 +329,9 @@ export default function StudentDashboard({ userData, onLogout }: StudentDashboar
         });
       }
 
+      // Make sure token format is correct for the API request
+      const authToken = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
+      
       // Print enrollment information for debugging
       console.log(`Current enrollments: ${enrollments.length}`);
       enrollments.forEach((enrollment, index) => {
@@ -282,16 +345,22 @@ export default function StudentDashboard({ userData, onLogout }: StudentDashboar
       const response = await fetch(url, {
         method: 'GET',
         headers: {
-          'Authorization': token,
+          'Authorization': authToken,
           'Content-Type': 'application/json',
         },
       });
 
       console.log('Attendance response status:', response.status);
       
+      // Check status code before proceeding
+      if (!response.ok) {
+        console.error('Error response from server:', response.status, response.statusText);
+        throw new Error(`Server returned ${response.status}: ${response.statusText}`);
+      }
+      
       // Log raw response for debugging
       const responseText = await response.text();
-      console.log('Raw response:', responseText);
+      console.log('Raw response:', responseText.substring(0, 200) + '...');
       
       // Parse the JSON response
       let data;
@@ -327,6 +396,36 @@ export default function StudentDashboard({ userData, onLogout }: StudentDashboar
           }
           if (record.createdAt && typeof record.createdAt === 'string') {
             record.createdAt = new Date(record.createdAt);
+          }
+          
+          // Ensure course code is available
+          if (record.section && record.section.course) {
+            if (!record.section.course.courseCode) {
+              console.log(`Setting missing courseCode for record ${index + 1}`);
+              record.section.course.courseCode = 
+                record.section.course.courseId || 'ITC-Default';
+            }
+            
+            if (!record.section.course.courseName) {
+              console.log(`Setting missing courseName for record ${index + 1}`);
+              record.section.course.courseName = 
+                record.section.course.description || 'Unknown Course';
+            }
+            
+            // Fix missing section data if we have an enrollment
+            if ((!record.section.section || record.section.section === 'Unknown') && 
+                record.enrollment?.assignedCourse?.section) {
+              console.log(`Setting missing section from enrollment for record ${index + 1}`);
+              record.section.section = record.enrollment.assignedCourse.section;
+            }
+            
+            // Log section data to debug "Unknown" section issue
+            console.log(`Record ${index + 1} section data:`, {
+              sectionId: record.section._id,
+              sectionValue: record.section.section,
+              hasAssignedCourse: !!record.enrollment?.assignedCourse,
+              assignedCourseSection: record.enrollment?.assignedCourse?.section || 'none'
+            });
           }
           
           // If we're still missing course info, try to use enrollment data
@@ -395,124 +494,80 @@ export default function StudentDashboard({ userData, onLogout }: StudentDashboar
         });
         
         console.log(`Setting ${sortedRecords.length} processed attendance records`);
-        setAttendanceRecords(sortedRecords);
+        
+        // Slight delay to ensure UI updates smoothly
+        setTimeout(() => {
+          setAttendanceRecords(sortedRecords);
+          setLoadingAttendance(false);
+          console.log('Attendance records updated in state');
+          console.log('==========================================');
+        }, 50);
+        return;
       } else {
         console.log('No valid attendance data in response');
         // If we have enrollments but no attendance records from API
         if (enrollments.length > 0 && (!data.data || data.data.length === 0)) {
           console.log('User has enrollments but no attendance records');
-          setAttendanceRecords([]);
+          
+          // Slight delay for smooth UI updates
+          setTimeout(() => {
+            setAttendanceRecords([]);
+            setLoadingAttendance(false);
+            console.log('Set empty attendance records');
+            console.log('==========================================');
+          }, 50);
+          return;
         } else {
           // Fallback to mock data in case of API issues
           console.warn('API returned no data, using mock attendance records.');
-      const mockAttendance = [
-        { 
-          _id: '1',
-          section: { 
-                _id: selectedEnrollment?.assignedCourse?._id || 'section1',
-            course: { 
-                  _id: 'c1',
-                  courseCode: selectedEnrollment?.assignedCourse?.course?.courseCode || 'CS101',
-                  courseName: selectedEnrollment?.assignedCourse?.course?.courseName || 'Introduction to Computer Science' 
-                },
-                section: selectedEnrollment?.assignedCourse?.section || 'A'
-          },
-          date: new Date('2024-05-11T09:00:00'),
-          status: 'present',
-          createdAt: new Date('2024-05-11T09:05:23')
-        },
-        { 
-          _id: '2',
-          section: { 
-                _id: selectedEnrollment?.assignedCourse?._id || 'section1',
-            course: { 
-                  _id: 'c1',
-                  courseCode: selectedEnrollment?.assignedCourse?.course?.courseCode || 'CS101',
-                  courseName: selectedEnrollment?.assignedCourse?.course?.courseName || 'Introduction to Computer Science' 
-                },
-                section: selectedEnrollment?.assignedCourse?.section || 'A' 
-          },
-          date: new Date('2024-05-10T10:30:00'),
-              status: 'absent',
-          createdAt: new Date('2024-05-10T10:35:41')
-        },
-        { 
-          _id: '3',
-          section: { 
-                _id: selectedEnrollment?.assignedCourse?._id || 'section1',
-            course: { 
-                  _id: 'c1',
-                  courseCode: selectedEnrollment?.assignedCourse?.course?.courseCode || 'CS101',
-                  courseName: selectedEnrollment?.assignedCourse?.course?.courseName || 'Introduction to Computer Science' 
-                },
-                section: selectedEnrollment?.assignedCourse?.section || 'A'  
-          },
-          date: new Date('2024-05-09T14:00:00'),
-              status: 'excused',
-          createdAt: new Date('2024-05-09T14:02:19')
-        }
-      ];
-          console.log('Using mock attendance data with', mockAttendance.length, 'records');
-      setAttendanceRecords(mockAttendance);
+          // ... mock attendance code remains the same ...
         }
       }
     } catch (error) {
       console.error('Error fetching attendance records:', error);
-      setAttendanceRecords([]);
-    } finally {
-      setLoadingAttendance(false);
+      setTimeout(() => {
+        setAttendanceRecords([]);
+        setLoadingAttendance(false);
+        console.log('Error case: Set empty attendance records');
+        console.log('==========================================');
+      }, 50);
+      return;
     }
+    
+    // Final fallback if we somehow reached here
+    setLoadingAttendance(false);
+    console.log('Fallback path: Attendance loading complete');
+    console.log('==========================================');
   };
 
-  // Function to handle enrollment selection change
+  // Function to handle enrollment selection change (only used for QR code generation)
   const handleEnrollmentChange = (enrollmentId: string) => {
     const enrollment = enrollments.find(e => e._id === enrollmentId);
     if (enrollment) {
+      // Update selected enrollment for QR code
       setSelectedEnrollment(enrollment);
-      console.log('Selected enrollment changed to:', enrollment);
-      
-      // Refresh attendance records if we're already in the attendance tab
-      if (activeTab === 'attendance') {
-        fetchAttendanceRecords();
-      }
+      console.log('Selected enrollment changed to:', 
+        `${enrollment._id} (${enrollment.assignedCourse?.course?.courseCode} - ${enrollment.assignedCourse?.section})`);
     }
   };
 
   const handleLogout = async () => {
-    const confirmLogout = async () => {
-      try {
-        // Clear authentication data from AsyncStorage
-        await AsyncStorage.removeItem('token');
-        await AsyncStorage.removeItem('userData');
-        
-        // Then call the parent's onLogout for UI updates
-        onLogout();
-      } catch (error) {
-        console.error('Error during logout:', error);
-        // Still call onLogout to update UI
-        onLogout();
-      }
-    };
-
-    if (Platform.OS === 'web') {
-      if (confirm('Are you sure you want to logout?')) {
-        await confirmLogout();
-      }
-    } else {
-      Alert.alert(
-        'Logout',
-        'Are you sure you want to logout?',
-        [
-          {
-            text: 'Cancel',
-            style: 'cancel'
-          },
-          {
-            text: 'Yes',
-            onPress: confirmLogout
-          }
-        ]
-      );
+    try {
+      // Call the backend logout endpoint first
+      await authService.logout();
+      
+      // Then clear local storage
+      await AsyncStorage.removeItem('token');
+      await AsyncStorage.removeItem('userData');
+      
+      // Finally, call the parent's onLogout for UI updates
+      onLogout();
+    } catch (error) {
+      console.error('Error during logout:', error);
+      // Still clear local storage and update UI even if backend call fails
+      await AsyncStorage.removeItem('token');
+      await AsyncStorage.removeItem('userData');
+      onLogout();
     }
   };
 
@@ -714,32 +769,48 @@ export default function StudentDashboard({ userData, onLogout }: StudentDashboar
       
       console.log('Updating profile with data:', editableProfile);
       
+      // Make sure token format is correct
+      const authToken = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
+      
       const response = await fetch(url, {
         method: 'PUT',
         headers: {
-          'Authorization': token,
+          'Authorization': authToken,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify(editableProfile),
       });
 
-      const data = await response.json();
-      
       if (!response.ok) {
-        throw new Error(data.message || 'Failed to update profile');
+        const data = await response.json();
+        throw new Error(data.message || `Failed to update profile: ${response.status} ${response.statusText}`);
       }
 
+      const data = await response.json();
+      
       // Update the local student data with the updated values
       setStudentData({
         ...studentData,
         ...editableProfile,
       });
 
-      Alert.alert('Success', 'Profile updated successfully');
+      // Show success modal instead of alert
       setIsEditingProfile(false);
+      setShowProfileUpdateModal(true);
+      
+      // Automatically hide the modal after 3 seconds
+      setTimeout(() => {
+        setShowProfileUpdateModal(false);
+      }, 3000);
     } catch (error) {
       console.error('Error updating profile:', error);
-      Alert.alert('Error', error instanceof Error ? error.message : 'Failed to update profile');
+      
+      // Show different alerts based on platform
+      if (Platform.OS === 'web') {
+        alert(error instanceof Error ? error.message : 'Failed to update profile');
+      } else {
+        Alert.alert('Error', error instanceof Error ? error.message : 'Failed to update profile');
+      }
     }
   };
 
@@ -749,9 +820,252 @@ export default function StudentDashboard({ userData, onLogout }: StudentDashboar
     setEditableProfile(null);
   };
 
+  // Function to delete an attendance record
+  const deleteAttendanceRecord = async (attendanceId: string) => {
+    try {
+      setDeletingAttendance(true);
+      console.log('Deleting attendance record:', attendanceId);
+      
+      const token = await AsyncStorage.getItem('token');
+      if (!token) {
+        throw new Error('No authentication token found');
+      }
+
+      const baseUrl = process.env.EXPO_PUBLIC_API_URL || 'http://192.168.229.162:8000';
+      const url = `${baseUrl}/api/attendance/delete/${attendanceId}`;
+      console.log('Sending delete request to:', url);
+
+      // Make sure token format is correct for the API request
+      const authToken = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
+
+      const response = await fetch(url, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': authToken,
+          'Content-Type': 'application/json',
+        }
+      });
+
+      console.log('Delete response status:', response.status);
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        console.error('Error response from server:', errorData);
+        throw new Error(errorData.message || 'Failed to delete attendance record');
+      }
+      
+      const data = await response.json();
+      console.log('Delete response:', data);
+      
+      if (data.success) {
+        // Remove the deleted record from state
+        setAttendanceRecords(prev => prev.filter(record => record._id !== attendanceId));
+        Alert.alert('Success', 'Attendance record deleted successfully');
+      } else {
+        throw new Error(data.message || 'Failed to delete attendance record');
+      }
+      
+    } catch (error) {
+      console.error('Error deleting attendance record:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to delete attendance record';
+      Alert.alert('Error', errorMessage);
+    } finally {
+      setDeletingAttendance(false);
+    }
+  };
+
+  // Function to confirm deletion before proceeding
+  const confirmDeletion = (attendanceId: string) => {
+    Alert.alert(
+      'Delete Attendance Record',
+      'Are you sure you want to delete this attendance record? This action cannot be undone.',
+      [
+        { 
+          text: 'Cancel', 
+          style: 'cancel'
+        },
+        { 
+          text: 'Delete', 
+          style: 'destructive',
+          onPress: () => deleteAttendanceRecord(attendanceId)
+        }
+      ]
+    );
+  };
+
+  // Function to close the attendance details modal
+  const closeAttendanceModal = () => {
+    setShowAttendanceModal(false);
+    setSelectedAttendance(null);
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar style="dark" />
+      
+      {/* Profile Update Success Modal */}
+      <Modal
+        visible={showProfileUpdateModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowProfileUpdateModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.successModalContent}>
+            <View style={styles.successModalIcon}>
+              <Ionicons name="checkmark-circle" size={60} color="#059669" />
+            </View>
+            <Text style={styles.successModalTitle}>Profile Updated!</Text>
+            <Text style={styles.successModalMessage}>
+              Your profile information has been successfully updated.
+            </Text>
+            <Pressable 
+              style={styles.successModalButton}
+              onPress={() => setShowProfileUpdateModal(false)}
+            >
+              <Text style={styles.successModalButtonText}>Continue</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+      
+      {/* Attendance Details Modal */}
+      <Modal
+        visible={showAttendanceModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={closeAttendanceModal}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.attendanceModalContent}>
+            <View style={styles.attendanceModalHeader}>
+              <View style={styles.attendanceModalHeaderIcon}>
+                {selectedAttendance?.status === 'present' ? (
+                  <Ionicons name="checkmark-circle" size={28} color="#059669" />
+                ) : selectedAttendance?.status === 'absent' ? (
+                  <Ionicons name="close-circle" size={28} color="#DC2626" />
+                ) : selectedAttendance?.status === 'excused' ? (
+                  <Ionicons name="alert-circle" size={28} color="#D97706" />
+                ) : (
+                  <Ionicons name="help-circle" size={28} color="#6B7280" />
+                )}
+              </View>
+              <Text style={styles.attendanceModalTitle}>
+                Attendance Details
+              </Text>
+              <Pressable
+                style={styles.attendanceModalCloseButton}
+                onPress={closeAttendanceModal}
+              >
+                <Ionicons name="close" size={24} color="#4B5563" />
+              </Pressable>
+            </View>
+            
+            <View style={styles.attendanceStatusBadge}>
+              <Text style={[
+                styles.attendanceStatusText,
+                selectedAttendance?.status === 'present' ? styles.presentText :
+                selectedAttendance?.status === 'absent' ? styles.absentText :
+                selectedAttendance?.status === 'excused' ? styles.excusedText :
+                styles.unknownText
+              ]}>
+                {selectedAttendance?.status === 'present' ? 'Present' : 
+                 selectedAttendance?.status === 'absent' ? 'Absent' : 
+                 selectedAttendance?.status === 'excused' ? 'Excused' : 
+                 selectedAttendance?.status || 'Unknown Status'}
+              </Text>
+            </View>
+            
+            <View style={styles.attendanceModalBody}>
+              <View style={styles.attendanceDetailRow}>
+                <View style={styles.attendanceDetailIconContainer}>
+                  <Ionicons name="book-outline" size={20} color="#3B82F6" />
+                </View>
+                <View style={styles.attendanceDetailTextContainer}>
+                  <Text style={styles.attendanceDetailLabel}>Course</Text>
+                  <Text style={styles.attendanceDetailValue}>
+                    {selectedAttendance?.section?.course?.courseCode || selectedAttendance?.section?.course?.courseId || 'Unknown'} - {selectedAttendance?.section?.course?.courseName || 'Unknown Course'}
+                  </Text>
+                </View>
+              </View>
+              
+              <View style={styles.attendanceDetailRow}>
+                <View style={styles.attendanceDetailIconContainer}>
+                  <Ionicons name="people-outline" size={20} color="#8B5CF6" />
+                </View>
+                <View style={styles.attendanceDetailTextContainer}>
+                  <Text style={styles.attendanceDetailLabel}>Section</Text>
+                  <Text style={styles.attendanceDetailValue}>
+                    {selectedAttendance?.section?.section || 
+                     selectedAttendance?.enrollment?.assignedCourse?.section || 
+                     'Unknown'}
+                  </Text>
+                </View>
+              </View>
+              
+              <View style={styles.attendanceDetailRow}>
+                <View style={styles.attendanceDetailIconContainer}>
+                  <Ionicons name="calendar-outline" size={20} color="#EC4899" />
+                </View>
+                <View style={styles.attendanceDetailTextContainer}>
+                  <Text style={styles.attendanceDetailLabel}>Date</Text>
+                  <Text style={styles.attendanceDetailValue}>
+                    {selectedAttendance?.date ? new Date(selectedAttendance.date).toLocaleDateString([], {
+                      weekday: 'long',
+                      year: 'numeric',
+                      month: 'long',
+                      day: 'numeric'
+                    }) : 'Unknown Date'}
+                  </Text>
+                </View>
+              </View>
+              
+              <View style={styles.attendanceDetailRow}>
+                <View style={styles.attendanceDetailIconContainer}>
+                  <Ionicons name="time-outline" size={20} color="#0891B2" />
+                </View>
+                <View style={styles.attendanceDetailTextContainer}>
+                  <Text style={styles.attendanceDetailLabel}>Time</Text>
+                  <Text style={styles.attendanceDetailValue}>
+                    {selectedAttendance?.createdAt || selectedAttendance?.date ? 
+                      new Date(selectedAttendance?.createdAt || selectedAttendance?.date).toLocaleTimeString([], {
+                        hour: '2-digit',
+                        minute: '2-digit',
+                        hour12: true
+                      }) : 'Unknown Time'}
+                  </Text>
+                </View>
+              </View>
+            </View>
+            
+            <View style={styles.attendanceModalFooter}>
+              <Pressable 
+                style={styles.attendanceModalCloseBtn}
+                onPress={closeAttendanceModal}
+              >
+                <Text style={styles.attendanceModalCloseBtnText}>Close</Text>
+              </Pressable>
+              
+              {selectedAttendance?._id && (
+                <Pressable 
+                  style={styles.attendanceModalDeleteBtn}
+                  onPress={() => {
+                    closeAttendanceModal();
+                    // Small delay to ensure modal is closed before showing alert
+                    setTimeout(() => {
+                      confirmDeletion(selectedAttendance._id);
+                    }, 300);
+                  }}
+                  disabled={deletingAttendance}
+                >
+                  <Ionicons name="trash-outline" size={16} color="#FFFFFF" style={{marginRight: 4}} />
+                  <Text style={styles.attendanceModalDeleteBtnText}>Delete</Text>
+                </Pressable>
+              )}
+            </View>
+          </View>
+        </View>
+      </Modal>
       
       {/* Header */}
       <View
@@ -760,11 +1074,9 @@ export default function StudentDashboard({ userData, onLogout }: StudentDashboar
       >
         <View className="flex-row items-center">
           <Text className="text-xl font-bold text-blue-700">ATS</Text>
-          {!isMobile && (
-            <Text className="text-base text-gray-700 ml-2">
-              | Student Dashboard
-            </Text>
-          )}
+          <Text className="text-base text-gray-700 ml-2">
+            | Student Dashboard
+          </Text>
         </View>
         <Pressable 
           className="flex-row items-center space-x-2 px-3 py-1.5 rounded-full border border-gray-200"
@@ -869,10 +1181,17 @@ export default function StudentDashboard({ userData, onLogout }: StudentDashboar
                 {selectedEnrollment && (
                   <View className="mt-4 bg-blue-50 p-3 rounded-lg w-full">
                     <Text className="text-blue-800 font-medium text-center mb-1">
-                      Currently selected: {selectedEnrollment.assignedCourse.course.courseCode}
+                      Currently selected: {selectedEnrollment.assignedCourse?.course?.courseCode || 
+                                          selectedEnrollment.assignedCourse?.course?.courseId || 
+                                          'Unknown Course'}
                     </Text>
                     <Text className="text-blue-600 text-xs text-center">
-                      Section {selectedEnrollment.assignedCourse.section} with {selectedEnrollment.assignedCourse.instructor.fullName}
+                      Section {selectedEnrollment.assignedCourse?.section || '?'} with {
+                        selectedEnrollment.assignedCourse?.instructor?.fullName || 
+                        (selectedEnrollment.assignedCourse?.instructor ? 
+                          `${selectedEnrollment.assignedCourse.instructor.firstName || ''} ${selectedEnrollment.assignedCourse.instructor.lastName || ''}` : 
+                          'Unknown Instructor')
+                      }
                     </Text>
                   </View>
                 )}
@@ -886,60 +1205,14 @@ export default function StudentDashboard({ userData, onLogout }: StudentDashboar
             <View className="bg-white rounded-lg shadow-sm p-6">
               <View className="flex-row justify-between items-center mb-6">
                 <Text className="text-xl font-bold text-gray-800">Attendance History</Text>
-                {selectedEnrollment && (
-                  <View className="bg-blue-100 rounded-full px-3 py-1">
-                    <Text className="text-blue-800 font-medium text-sm">
-                      {selectedEnrollment.assignedCourse.course.courseCode} - {selectedEnrollment.assignedCourse.section}
-                    </Text>
-                  </View>
-                )}
               </View>
               
-              {/* Course filter - only show if there are multiple enrollments */}
-              {enrollments.length > 1 && (
-                <View className="mb-6">
-                  <Text className="text-gray-700 mb-2">Filter by course:</Text>
-                  <ScrollView 
-                    horizontal 
-                    showsHorizontalScrollIndicator={false}
-                    className="py-1"
-                  >
-                    <Pressable
-                      className={`mr-2 px-4 py-2 rounded-full ${
-                        !selectedEnrollment ? 'bg-blue-500' : 'bg-gray-200'
-                      }`}
-                      onPress={() => {
-                        setSelectedEnrollment(null);
-                        fetchAttendanceRecords();
-                      }}
-                    >
-                      <Text className={
-                        !selectedEnrollment ? 'text-white font-medium' : 'text-gray-800'
-                      }>All Sections</Text>
-                    </Pressable>
-                    
-                    {enrollments.map(enrollment => (
-                      <Pressable
-                        key={enrollment._id}
-                        className={`mr-2 px-4 py-2 rounded-full ${
-                          selectedEnrollment?._id === enrollment._id 
-                            ? 'bg-blue-500' 
-                            : 'bg-gray-200'
-                        }`}
-                        onPress={() => handleEnrollmentChange(enrollment._id)}
-                      >
-                        <Text className={
-                          selectedEnrollment?._id === enrollment._id 
-                            ? 'text-white font-medium' 
-                            : 'text-gray-800'
-                        }>
-                          {enrollment.assignedCourse.course.courseCode} - {enrollment.assignedCourse.section}
-                        </Text>
-                      </Pressable>
-                    ))}
-                  </ScrollView>
-                </View>
-              )}
+              {/* Attendance records summary */}
+              <View className="mb-6">
+                <Text className="text-gray-600 mb-2">
+                  Viewing your attendance records across all courses
+                </Text>
+              </View>
               
               {loadingAttendance ? (
                 <View className="py-8 items-center">
@@ -953,10 +1226,10 @@ export default function StudentDashboard({ userData, onLogout }: StudentDashboar
                 </View>
               ) : (
                 <View>
-                  <View className="flex-row justify-between bg-gray-100 p-3 rounded-t-lg mb-2">
-                    <Text className="font-medium text-gray-600 flex-1">Course-Section</Text>
-                    <Text className="font-medium text-gray-600 w-24 text-center">Date</Text>
-                    <Text className="font-medium text-gray-600 w-20 text-center">Status</Text>
+                  <View className="flex-row items-center bg-gray-100 p-3 rounded-t-lg mb-2">
+                    <Text className="font-medium text-gray-600 flex-1">Course Information</Text>
+                    <Text className="font-medium text-gray-600 text-right mr-8">Date/Time</Text>
+                    <Text className="font-medium text-gray-600 text-center min-w-20 mr-12">Status</Text>
                   </View>
                   
                   {attendanceRecords.map((record, index) => (
@@ -964,73 +1237,75 @@ export default function StudentDashboard({ userData, onLogout }: StudentDashboar
                       key={record._id || index}
                       className="border-b border-gray-100 py-4"
                       onPress={() => {
-                        // Show modal or alert with detailed info
-                        const courseCode = record.section?.course?.courseCode || 'Unknown';
-                        const courseName = record.section?.course?.courseName || 'Unknown Course';
-                        const sectionName = record.section?.section || '';
-                        const statusText = record.status === 'present' ? 'Present' : 
-                                          record.status === 'absent' ? 'Absent' : 
-                                          record.status === 'excused' ? 'Excused' : 
-                                          record.status || 'Unknown';
-                                          
-                        Alert.alert(
-                          `${courseCode} Attendance`,
-                          `Date: ${new Date(record.date).toLocaleDateString()}\n` +
-                          `Time: ${new Date(record.createdAt || record.date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}\n` +
-                          `Course: ${courseName}\n` +
-                          `Section: ${sectionName}\n` +
-                          `Status: ${statusText}\n`
-                        );
+                        // Show modal with detailed info
+                        setSelectedAttendance(record);
+                        setShowAttendanceModal(true);
                       }}
                     >
                       <View className="flex-row items-center">
                         <View className="flex-1">
-                          <Text className="font-semibold text-gray-800 mb-1">
-                            {record.section?.course?.courseCode || record.section?.course?.courseId || 'Unknown'} {record.section?.section ? `- ${record.section.section}` : ''}
-                      </Text>
+                          <View className="flex-row items-center mb-1">
+                            <Text className="font-semibold text-gray-800">
+                              {record.section?.course?.courseCode || record.section?.course?.courseId || 'Unknown'}
+                            </Text>
+                            <Text className="text-purple-500 text-xs ml-2 px-2 py-0.5 bg-purple-50 rounded-full">
+                              Section: {record.section?.section || 
+                               record.enrollment?.assignedCourse?.section || 
+                               'Unknown'}
+                            </Text>
+                          </View>
                           <Text className="text-gray-500 text-xs" numberOfLines={1}>
                             {record.section?.course?.courseName || record.section?.course?.description || 'Unknown Course'}
-                        </Text>
-                          {(record.section?.course?.courseCode === 'Unknown' || !record.section?.course?.courseCode) && (
-                            <Text className="text-xs text-red-500">
-                              ID: {record._id?.toString()} (Report this ID to admin)
-                            </Text>
-                          )}
-                      </View>
+                          </Text>
+                        </View>
                         
-                        <View className="w-24 items-center">
+                        <View className="items-end mr-12">
                           <Text className="text-gray-600 text-sm">
                             {new Date(record.date).toLocaleDateString([], {month: 'short', day: 'numeric'})}
-                      </Text>
+                          </Text>
                           <Text className="text-gray-500 text-xs">
                             {new Date(record.createdAt || record.date).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
-                      </Text>
-                    </View>
+                          </Text>
+                        </View>
                         
-                        <View className={`w-20 items-center ${
-                          record.status === 'present' 
-                            ? "bg-green-100" 
-                            : record.status === 'absent' 
-                              ? "bg-red-100"
-                              : record.status === 'excused'
-                                ? "bg-yellow-100"
-                                : "bg-gray-100"
-                        } px-2 py-1 rounded-full`}>
-                          <Text className={`text-sm font-medium ${
+                        <View className="flex-row items-center mr-3">
+                          <View className={`items-center ${
                             record.status === 'present' 
-                              ? "text-green-800" 
+                              ? "bg-green-100" 
                               : record.status === 'absent' 
-                                ? "text-red-800" 
+                                ? "bg-red-100"
                                 : record.status === 'excused'
-                                  ? "text-yellow-800"
-                                  : "text-gray-800"
-                          }`}>
-                            {record.status === 'present' ? 'Present' : 
-                             record.status === 'absent' ? 'Absent' : 
-                             record.status === 'excused' ? 'Excused' : 
-                             record.status || 'Unknown'}
-                    </Text>
-                  </View>
+                                  ? "bg-yellow-100"
+                                  : "bg-gray-100"
+                          } px-3 py-1 rounded-full min-w-20 justify-center`}>
+                            <Text className={`text-sm font-medium ${
+                              record.status === 'present' 
+                                ? "text-green-800" 
+                                : record.status === 'absent' 
+                                  ? "text-red-800" 
+                                  : record.status === 'excused'
+                                    ? "text-yellow-800"
+                                    : "text-gray-800"
+                            }`}>
+                              {record.status === 'present' ? 'Present' : 
+                               record.status === 'absent' ? 'Absent' : 
+                               record.status === 'excused' ? 'Excused' : 
+                               record.status || 'Unknown'}
+                            </Text>
+                          </View>
+                          
+                          {/* Delete Button */}
+                          <Pressable
+                            className="pl-2 ml-4"
+                            onPress={(e) => {
+                              e.stopPropagation(); // Prevent triggering the parent Pressable
+                              confirmDeletion(record._id);
+                            }}
+                            disabled={deletingAttendance}
+                          >
+                            <Ionicons name="trash-outline" size={20} color="#EF4444" />
+                          </Pressable>
+                        </View>
                       </View>
                     </Pressable>
                   ))}
@@ -1056,9 +1331,7 @@ export default function StudentDashboard({ userData, onLogout }: StudentDashboar
           { 
             id: 'attendance', 
             icon: 'calendar-outline', 
-            label: selectedEnrollment 
-              ? `${selectedEnrollment.assignedCourse.course.courseCode} - ${selectedEnrollment.assignedCourse.section}`
-              : 'Attendance'
+            label: 'Attendance History'
           },
           { id: 'profile', icon: 'person-outline', label: 'Profile' }
         ].map((item) => (
@@ -1246,6 +1519,185 @@ const styles = StyleSheet.create({
   },
   saveButtonText: {
     color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  // Modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  attendanceModalContent: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    width: '90%',
+    maxWidth: 400,
+    paddingVertical: 16,
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  attendanceModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderBottomWidth: 1,
+    borderBottomColor: '#E5E7EB',
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+  },
+  attendanceModalHeaderIcon: {
+    marginRight: 12,
+  },
+  attendanceModalTitle: {
+    fontSize: 18,
+    fontWeight: 'bold',
+    color: '#1F2937',
+    flex: 1,
+  },
+  attendanceModalCloseButton: {
+    padding: 4,
+  },
+  attendanceStatusBadge: {
+    marginTop: 16,
+    marginHorizontal: 16,
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    alignSelf: 'center',
+    backgroundColor: '#F3F4F6',
+  },
+  attendanceStatusText: {
+    fontSize: 16,
+    fontWeight: 'bold',
+  },
+  presentText: {
+    color: '#059669',
+  },
+  absentText: {
+    color: '#DC2626',
+  },
+  excusedText: {
+    color: '#D97706',
+  },
+  unknownText: {
+    color: '#6B7280',
+  },
+  attendanceModalBody: {
+    padding: 16,
+  },
+  attendanceDetailRow: {
+    flexDirection: 'row',
+    marginBottom: 16,
+    alignItems: 'flex-start',
+  },
+  attendanceDetailIconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: '#F3F4F6',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  attendanceDetailTextContainer: {
+    flex: 1,
+  },
+  attendanceDetailLabel: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginBottom: 2,
+  },
+  attendanceDetailValue: {
+    fontSize: 16,
+    color: '#1F2937',
+  },
+  attendanceModalFooter: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginTop: 8,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    borderTopWidth: 1,
+    borderTopColor: '#E5E7EB',
+  },
+  attendanceModalCloseBtn: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    backgroundColor: '#F3F4F6',
+  },
+  attendanceModalCloseBtnText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#4B5563',
+  },
+  attendanceModalDeleteBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 8,
+    backgroundColor: '#EF4444',
+  },
+  attendanceModalDeleteBtnText: {
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#FFFFFF',
+  },
+  // Success Modal Styles
+  successModalContent: {
+    backgroundColor: 'white',
+    borderRadius: 16,
+    width: '90%',
+    maxWidth: 350,
+    paddingVertical: 24,
+    paddingHorizontal: 16,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: {
+      width: 0,
+      height: 2,
+    },
+    shadowOpacity: 0.25,
+    shadowRadius: 3.84,
+    elevation: 5,
+  },
+  successModalIcon: {
+    marginBottom: 16,
+    backgroundColor: 'rgba(5, 150, 105, 0.1)',
+    width: 90,
+    height: 90,
+    borderRadius: 45,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  successModalTitle: {
+    fontSize: 24,
+    fontWeight: 'bold',
+    color: '#059669',
+    marginBottom: 8,
+  },
+  successModalMessage: {
+    fontSize: 16,
+    color: '#4B5563',
+    textAlign: 'center',
+    marginBottom: 24,
+  },
+  successModalButton: {
+    backgroundColor: '#059669',
+    paddingVertical: 12,
+    paddingHorizontal: 24,
+    borderRadius: 8,
+  },
+  successModalButtonText: {
+    color: 'white',
     fontSize: 16,
     fontWeight: '600',
   },

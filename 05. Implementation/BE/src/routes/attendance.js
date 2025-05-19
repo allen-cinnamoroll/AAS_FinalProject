@@ -4,7 +4,8 @@ import {
     getAttendanceBySection,
     getStudentAttendance,
     markAbsent,
-    updateAttendanceStatus
+    updateAttendanceStatus,
+    deleteAttendance
 } from '../controllers/attendanceController.js';
 import { authenticate, authorizeRole } from '../middleware/authMiddleware.js';
 
@@ -43,6 +44,13 @@ router.get('/my-attendance',
     authenticate,
     authorizeRole('student'),
     getStudentAttendance
+);
+
+// Delete student's own attendance record (student only)
+router.delete('/delete/:attendanceId',
+    authenticate,
+    authorizeRole('student'),
+    deleteAttendance
 );
 
 export default router; 
