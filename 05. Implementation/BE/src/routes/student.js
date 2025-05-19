@@ -9,7 +9,7 @@ import {
 } from '../controllers/studentController.js';
 import { authenticate, authorizeRole } from '../middleware/authMiddleware.js';
 import { studentValidationRules, validate, photoValidation } from '../middleware/validator.js';
-import upload from '../middleware/upload.js';
+import { uploadStudent } from '../middleware/upload.js';
 
 const router = express.Router();
 
