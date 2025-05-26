@@ -1,0 +1,43 @@
+[
+  {
+    "_id": "681f3f9c7b409b79003a7789",
+    "firstName": "Kent",
+    "lastName": "Luardo",
+    "suffix": "",
+    "yearLevel": "2",
+    "program": "Bachelor of Science in Hospitality Management",
+    "faculty": "Faculty of Business and Management",
+    "studentId": "2022-0001",
+    "gmail": "kentchristianluardo@gmail.com",
+    "role": "2",
+    "lastLogin": null,
+    "lastLogout": null,
+    "otp": {},
+    "isEmailVerified": false,
+    "idPhoto": {},
+    "createdAt": "2025-05-10T11:59:24.988Z",
+    "updatedAt": "2025-05-10T11:59:24.988Z",
+    "__v": 0
+  },
+  {
+    "_id": "681f3f9c7b409b79003a7790",
+    "firstName": "Allen",
+    "lastName": "Lagangga",
+    "suffix": "",
+    "yearLevel": "3",
+    "program": "Bachelor of Science in Information Technology",
+    "faculty": "Faculty of Computing",
+    "studentId": "2021-0002",
+    "gmail": "allen.lagangga@gmail.com",
+    "role": "2",
+    "lastLogin": null,
+    "lastLogout": null,
+    "otp": {},
+    "isEmailVerified": true,
+    "idPhoto": {},
+    "createdAt": "2025-05-10T11:59:24.988Z",
+    "updatedAt": "2025-05-10T11:59:24.988Z",
+    "__v": 0
+  }
+]
+    
