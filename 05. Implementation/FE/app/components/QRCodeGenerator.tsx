@@ -15,6 +15,7 @@ export default function QRCodeGenerator({ value, size = 200 }: QRCodeGeneratorPr
         size={size}
         backgroundColor="white"
         color="black"
+        testID="qr-code-svg"
       />
     </View>
   );
