@@ -1,0 +1,26 @@
+[
+  {
+    "_id": "682958b32b7d1de4e78ae734",
+    "student": "68261152510a8d96615e421c",
+    "section": "682957892b7d1de4e78adfcb",
+    "enrollment": "682957912b7d1de4e78adfe5",
+    "date": "2025-05-18T03:49:04.351Z",
+    "status": "present",
+    "recordedBy": "68260fbee780d942f6758130",
+    "createdAt": "2025-05-18T03:49:07.503Z",
+    "updatedAt": "2025-05-18T03:49:07.503Z",
+    "__v": 0
+  },
+  {
+    "_id": "682958b42b7d1de4e78ae74d",
+    "student": "68261152510a8d96615e421c",
+    "section": "682957892b7d1de4e78adfcb",
+    "enrollment": "682957912b7d1de4e78adfe5",
+    "date": "2025-05-18T03:49:05.915Z",
+    "status": "present",
+    "recordedBy": "68260fbee780d942f6758130",
+    "createdAt": "2025-05-18T03:49:08.837Z",
+    "updatedAt": "2025-05-18T03:49:08.837Z",
+    "__v": 0
+  }
+]
