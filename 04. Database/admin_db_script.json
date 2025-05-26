@@ -1,0 +1,73 @@
+[
+  {
+    "username": "kent",
+    "gmail": "kentluardo076@gmail.com",
+    "password": "$2b$10$abc123hashedexample1",
+    "role": "0",
+    "isPasswordChange": false,
+    "otp": {
+      "code": null,
+      "expiresAt": null
+    },
+    "isEmailVerified": false,
+    "lastLogin": null,
+    "lastLogout": null,
+    "createdAt": { "$date": "2025-05-01T10:00:00Z" },
+    "updatedAt": { "$date": "2025-05-01T10:00:00Z" }
+  },
+  {
+    "username": "allen",
+    "gmail": "laganggaallenjean@gmail.com",
+    "password": "$2b$10$abc123hashedexample2",
+    "role": "0",
+    "isPasswordChange": false,
+    "otp": null,
+    "isEmailVerified": true,
+    "lastLogin": { "$date": "2025-05-10T17:56:54.938Z" },
+    "lastLogout": null,
+    "createdAt": { "$date": "2025-05-02T08:30:00Z" },
+    "updatedAt": { "$date": "2025-05-10T09:56:54.941Z" }
+  },
+  {
+    "username": "jessa",
+    "gmail": "jessa.diano@example.com",
+    "password": "$2b$10$abc123hashedexample3",
+    "role": "0",
+    "isPasswordChange": false,
+    "otp": null,
+    "isEmailVerified": false,
+    "lastLogin": null,
+    "lastLogout": null,
+    "createdAt": { "$date": "2025-05-03T09:00:00Z" },
+    "updatedAt": { "$date": "2025-05-03T09:00:00Z" }
+  },
+  {
+    "username": "kristine",
+    "gmail": "kristine.bonotan@example.com",
+    "password": "$2b$10$abc123hashedexample4",
+    "role": "0",
+    "isPasswordChange": false,
+    "otp": {
+      "code": null,
+      "expiresAt": null
+    },
+    "isEmailVerified": true,
+    "lastLogin": null,
+    "lastLogout": null,
+    "createdAt": { "$date": "2025-05-04T14:15:00Z" },
+    "updatedAt": { "$date": "2025-05-04T14:15:00Z" }
+  },
+  {
+    "username": "gilliene",
+    "gmail": "gilliene.jiminez@example.com",
+    "password": "$2b$10$abc123hashedexample5",
+    "role": "0",
+    "isPasswordChange": false,
+    "otp": null,
+    "isEmailVerified": true,
+    "lastLogin": null,
+    "lastLogout": null,
+    "createdAt": { "$date": "2025-05-05T11:45:00Z" },
+    "updatedAt": { "$date": "2025-05-05T11:45:00Z" }
+  }
+]
