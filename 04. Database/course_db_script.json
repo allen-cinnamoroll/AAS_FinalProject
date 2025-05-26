@@ -1,0 +1,32 @@
+[
+  {
+    "_id": "682957702b7d1de4e78adfaf",
+    "courseId": "ITC100",
+    "description": "Programming 1",
+    "courseType": "Lec",
+    "units": 2,
+    "term": "1",
+    "faculty": "FaCET",
+    "program": "BSIT",
+    "createdAt": "2025-05-18T03:43:44.064Z",
+    "updatedAt": "2025-05-20T02:43:58.664Z",
+    "courseCode": "ITC100",
+    "courseName": "Programming 1",
+    "__v": 0
+  },
+  {
+    "_id": "682ebda6df85c38d54df7bdc",
+    "courseId": "ITC130",
+    "description": "Emerging Technology",
+    "courseType": "Lab",
+    "units": 3,
+    "term": "2",
+    "faculty": "FaCET",
+    "program": "BSIT",
+    "createdAt": "2025-05-22T06:01:10.445Z",
+    "updatedAt": "2025-05-22T06:01:10.445Z",
+    "courseCode": "ITC130",
+    "courseName": "Emerging Technology",
+    "__v": 0
+  }
+]
