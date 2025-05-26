@@ -1,0 +1,26 @@
+[
+  {
+    "_id": "682957892b7d1de4e78adfcb",
+    "course": "682957702b7d1de4e78adfaf",
+    "instructor": "68260fbee780d942f6758130",
+    "section": "1A",
+    "schedule": {
+      "semester": "1",
+      "createdAt": "2025-05-18T03:44:09.044Z",
+      "updatedAt": "2025-05-18T03:44:09.044Z"
+    },
+    "__v": 0
+  },
+  {
+    "_id": "682e8708475df4434aafb481",
+    "course": "682e86a6475df4434aafb449",
+    "instructor": "68260fbee780d942f6758130",
+    "section": "3B",
+    "schedule": {
+      "semester": "2",
+      "createdAt": "2025-05-22T02:08:08.652Z",
+      "updatedAt": "2025-05-22T02:08:08.652Z"
+    },
+    "__v": 0
+  }
+]
